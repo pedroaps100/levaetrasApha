@@ -18,7 +18,12 @@ const parseCurrency = (value: string | number | undefined | null): number => {
     if (typeof value !== 'string' || value.trim() === '') {
         return 0;
     }
-    const sanitized = value.replace(/\./g, '').replace(',', '.');
+    // More robust parsing: removes R$, handles thousand separators, and converts comma to dot.
+    const sanitized = value
+        .replace("R$", "")
+        .trim()
+        .replace(/\./g, "")
+        .replace(",", ".");
     const parsed = parseFloat(sanitized);
     return isNaN(parsed) ? 0 : parsed;
 };
@@ -182,34 +187,32 @@ export const ConciliacaoDialog: React.FC<ConciliacaoDialogProps> = ({ isOpen, on
             return false;
         }
     
-        for (const [index, rota] of solicitacao.rotas.entries()) {
-            const formRota = watchedRotas[index];
-            if (!formRota) return false;
+        return solicitacao.rotas.every((rota, index) => {
+            const formRotaData = watchedRotas[index];
+            if (!formRotaData) return false;
     
-            // Validate Taxa Payments
-            const totalTaxaPago = formRota.pagamentosTaxa?.reduce((sum, p) => sum + parseCurrency(p.valor), 0) || 0;
+            const totalTaxaPago = (formRotaData.pagamentosTaxa || []).reduce((sum, p) => sum + parseCurrency(p.valor), 0);
             if (Math.abs(rota.taxaEntrega - totalTaxaPago) > 0.01) {
-                return false; // Total doesn't match
+                return false;
             }
-            for (const pagamento of formRota.pagamentosTaxa || []) {
+            for (const pagamento of formRotaData.pagamentosTaxa || []) {
                 if (parseCurrency(pagamento.valor) > 0 && !pagamento.formaPagamentoId) {
-                    return false; // A payment was entered but no method was selected
+                    return false;
                 }
             }
     
-            // Validate Repasse Payments
-            const totalRepassePago = formRota.pagamentosRepasse?.reduce((sum, p) => sum + parseCurrency(p.valor), 0) || 0;
+            const totalRepassePago = (formRotaData.pagamentosRepasse || []).reduce((sum, p) => sum + parseCurrency(p.valor), 0);
             if (Math.abs((rota.valorExtra || 0) - totalRepassePago) > 0.01) {
-                return false; // Total doesn't match
+                return false;
             }
-            for (const pagamento of formRota.pagamentosRepasse || []) {
+            for (const pagamento of formRotaData.pagamentosRepasse || []) {
                 if (parseCurrency(pagamento.valor) > 0 && !pagamento.formaPagamentoId) {
-                    return false; // A payment was entered but no method was selected
+                    return false;
                 }
             }
-        }
     
-        return true; // All checks passed for all rotas
+            return true;
+        });
     }, [solicitacao, watchedRotas]);
 
     const onSubmit = (data: any) => {
