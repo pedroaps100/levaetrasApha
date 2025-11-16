@@ -56,10 +56,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [clients, entregadores]);
 
   const login = async (email: string, password: string): Promise<User> => {
-    console.log(password); // to avoid lint error
-
     const userAccount = systemUsers.find(u => u.email === email);
-    if (!userAccount) {
+    
+    if (!userAccount || userAccount.password !== password) {
       throw new Error("Credenciais inválidas");
     }
     

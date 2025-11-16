@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Solicitacao, Rota, SolicitacaoStatus, Entregador, Cliente, ConciliacaoData, FormaPagamentoConciliacao } from '@/types';
+import { Solicitacao, Rota, SolicitacaoStatus, Entregador, Cliente, ConciliacaoData, FormaPagamentoConciliacao, TaxaExtra, SolicitacaoHistoricoItem, SolicitacaoAcao } from '@/types';
 import { faker } from '@faker-js/faker';
 import { useFaturasData } from './useFaturasData';
 import { useTransaction } from '@/contexts/TransactionContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 // --- LocalStorage Helper ---
 function loadFromStorage<T>(key: string, defaultValue: T): T {
@@ -15,6 +16,7 @@ function loadFromStorage<T>(key: string, defaultValue: T): T {
             return parsed.map(s => ({
                 ...s,
                 dataSolicitacao: new Date(s.dataSolicitacao),
+                historico: Array.isArray(s.historico) ? s.historico.map((h: any) => ({...h, data: new Date(h.data)})) : []
             })) as T;
         }
         return parsed;
@@ -52,6 +54,13 @@ const generateMockSolicitacoes = (count: number): Solicitacao[] => {
         const entregadorNome = status !== 'pendente' ? faker.person.fullName() : undefined;
         const justificativa = ['cancelada', 'rejeitada'].includes(status) ? faker.lorem.sentence() : undefined;
 
+        const historico: SolicitacaoHistoricoItem[] = [
+            { id: faker.string.uuid(), data: faker.date.recent({days: 2}), acao: 'criada', usuarioId: 'user-1', usuarioNome: 'Admin' }
+        ];
+        if (status !== 'pendente') {
+            historico.push({ id: faker.string.uuid(), data: faker.date.recent({days: 1}), acao: 'aceita', usuarioId: 'user-1', usuarioNome: 'Admin' });
+        }
+
         return {
             id: faker.string.uuid(),
             codigo: `SOL-${1001 + i}`,
@@ -70,6 +79,7 @@ const generateMockSolicitacoes = (count: number): Solicitacao[] => {
             valorTotalTaxas: rotas.reduce((sum, r) => sum + r.taxaEntrega, 0),
             valorTotalRepasse: rotas.reduce((sum, r) => sum + (r.valorExtra || 0), 0),
             justificativa,
+            historico,
         };
     });
 };
@@ -77,6 +87,7 @@ const generateMockSolicitacoes = (count: number): Solicitacao[] => {
 export const useSolicitacoesData = () => {
     const { addEntregaToFatura } = useFaturasData();
     const { addTransaction } = useTransaction();
+    const { user } = useAuth();
     const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>(() => {
         let data = loadFromStorage<Solicitacao[]>('app_solicitacoes', []);
         
@@ -101,6 +112,14 @@ export const useSolicitacoesData = () => {
 
 
     const addSolicitacao = (data: Omit<Solicitacao, 'id' | 'codigo' | 'dataSolicitacao' | 'status'>, byAdmin: boolean = true): Solicitacao => {
+        const historicoInicial: SolicitacaoHistoricoItem = {
+            id: faker.string.uuid(),
+            data: new Date(),
+            acao: 'criada',
+            usuarioId: user!.id,
+            usuarioNome: user!.nome,
+        };
+        
         const newSolicitacao: Solicitacao = {
             ...data,
             id: faker.string.uuid(),
@@ -108,6 +127,7 @@ export const useSolicitacoesData = () => {
             dataSolicitacao: new Date(),
             status: byAdmin ? 'aceita' : 'pendente',
             rotas: data.rotas.map(r => ({ ...r, id: r.id || faker.string.uuid() })),
+            historico: [historicoInicial],
         };
         setSolicitacoes(prev => [newSolicitacao, ...prev]);
         return newSolicitacao;
@@ -116,13 +136,21 @@ export const useSolicitacoesData = () => {
     const updateSolicitacao = (id: string, data: Partial<Omit<Solicitacao, 'id' | 'codigo' | 'dataSolicitacao'>>) => {
         setSolicitacoes(prev => prev.map(s => {
             if (s.id === id) {
-                const updatedData = { ...s, ...data };
+                const updatedData: Solicitacao = { ...s, ...data };
                 if (updatedData.rotas) {
                     updatedData.rotas = updatedData.rotas.map(r => ({
                         ...r,
                         id: r.id || faker.string.uuid()
                     }));
                 }
+                const historicoEdicao: SolicitacaoHistoricoItem = {
+                    id: faker.string.uuid(),
+                    data: new Date(),
+                    acao: 'editada',
+                    usuarioId: user!.id,
+                    usuarioNome: user!.nome,
+                };
+                updatedData.historico = [...(updatedData.historico || []), historicoEdicao];
                 return updatedData;
             }
             return s;
@@ -139,10 +167,35 @@ export const useSolicitacoesData = () => {
         ));
     };
 
-    const updateStatusSolicitacao = (id: string, newStatus: SolicitacaoStatus, details?: { justificativa?: string; entregador?: Entregador; cliente?: Cliente; conciliacao?: ConciliacaoData; formasPagamento?: FormaPagamentoConciliacao[] }) => {
+    const updateStatusSolicitacao = (id: string, newStatus: SolicitacaoStatus, details?: { justificativa?: string; entregador?: Entregador; cliente?: Cliente; conciliacao?: ConciliacaoData; formasPagamento?: FormaPagamentoConciliacao[]; taxasExtras?: TaxaExtra[] }) => {
         setSolicitacoes(prev => prev.map(s => {
             if (s.id === id) {
                 const updatedSolicitacao: Solicitacao = { ...s, status: newStatus };
+                
+                const newHistoryItem: Partial<SolicitacaoHistoricoItem> = {
+                    id: faker.string.uuid(),
+                    data: new Date(),
+                    usuarioId: user!.id,
+                    usuarioNome: user!.nome,
+                };
+
+                let acao: SolicitacaoAcao | null = null;
+                switch (newStatus) {
+                    case 'aceita': acao = 'aceita'; break;
+                    case 'em_andamento': acao = 'iniciada'; break;
+                    case 'concluida': acao = 'conciliada'; break;
+                    case 'rejeitada': acao = 'rejeitada'; break;
+                    case 'cancelada': acao = 'cancelada'; break;
+                }
+
+                if (acao) {
+                    newHistoryItem.acao = acao;
+                    if (details?.justificativa) {
+                        newHistoryItem.detalhes = details.justificativa;
+                    }
+                    updatedSolicitacao.historico = [...(s.historico || []), newHistoryItem as SolicitacaoHistoricoItem];
+                }
+
                 if (details?.justificativa) updatedSolicitacao.justificativa = details.justificativa;
                 if (details?.entregador) {
                     updatedSolicitacao.entregadorId = details.entregador.id;
@@ -162,8 +215,8 @@ export const useSolicitacoesData = () => {
                             clientName: s.clienteNome,
                             clientAvatar: s.clienteAvatar,
                         });
-                    } else if (details.cliente.modalidade === 'faturado' && details.conciliacao && details.formasPagamento) {
-                        addEntregaToFatura(updatedSolicitacao, details.conciliacao, details.formasPagamento);
+                    } else if (details.cliente.modalidade === 'faturado' && details.taxasExtras) {
+                        addEntregaToFatura(updatedSolicitacao, details.taxasExtras);
                     }
                 }
 

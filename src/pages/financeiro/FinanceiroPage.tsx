@@ -27,14 +27,22 @@ export const FinanceiroPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [despesaToEdit, setDespesaToEdit] = useState<Despesa | null>(null);
+    const [isViewOnly, setIsViewOnly] = useState(false);
 
     const handleOpenForm = (despesa: Despesa | null) => {
         setDespesaToEdit(despesa);
+        setIsViewOnly(false);
+        setIsFormOpen(true);
+    };
+
+    const handleOpenView = (despesa: Despesa) => {
+        setDespesaToEdit(despesa);
+        setIsViewOnly(true);
         setIsFormOpen(true);
     };
 
     const handleFormSubmit = (data: Omit<Despesa, 'id'>) => {
-        if (despesaToEdit) {
+        if (despesaToEdit && !isViewOnly) {
             updateDespesa(despesaToEdit.id, data);
             toast.success("Despesa atualizada com sucesso!");
         } else {
@@ -98,7 +106,7 @@ export const FinanceiroPage: React.FC = () => {
 
     const renderActions = (despesa: Despesa) => (
         <div className="flex items-center justify-end gap-2">
-            <Button variant="ghost" size="icon" title="Visualizar"><Eye className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" title="Visualizar" onClick={() => handleOpenView(despesa)}><Eye className="h-4 w-4" /></Button>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -189,7 +197,13 @@ export const FinanceiroPage: React.FC = () => {
                 </TabsContent>
                 <TabsContent value="receitas" className="mt-4"><div className="text-center p-10 text-muted-foreground">A aba de Receitas será implementada na próxima fase.</div></TabsContent>
             </Tabs>
-            <DespesaFormDialog open={isFormOpen} onOpenChange={setIsFormOpen} despesaToEdit={despesaToEdit} onFormSubmit={handleFormSubmit} />
+            <DespesaFormDialog 
+                open={isFormOpen} 
+                onOpenChange={setIsFormOpen} 
+                despesaToEdit={despesaToEdit} 
+                onFormSubmit={handleFormSubmit}
+                viewOnly={isViewOnly}
+            />
         </div>
     );
 };

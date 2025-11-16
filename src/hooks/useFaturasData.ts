@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Fatura, FaturaStatusGeral, FaturaStatusPagamento, FaturaStatusRepasse, EntregaIncluida, HistoricoItem, Solicitacao, ConciliacaoData, FormaPagamentoConciliacao } from '@/types';
+import { Fatura, FaturaStatusGeral, FaturaStatusPagamento, FaturaStatusRepasse, EntregaIncluida, HistoricoItem, Solicitacao, TaxaExtra } from '@/types';
 import { faker } from '@faker-js/faker';
-import { subDays, addDays, addHours } from 'date-fns';
+import { subDays, addDays, addHours, format } from 'date-fns';
 
 // --- LocalStorage Helper ---
 function loadFromStorage<T>(key: string, defaultValue: T): T {
@@ -39,10 +39,12 @@ const generateMockEntregasIncluidas = (count: number): EntregaIncluida[] => {
     return Array.from({length: count}, (_, i) => ({
         id: `ENT-${5842 + i}`,
         data: faker.date.recent({days: 10}),
-        endereco: faker.location.streetAddress(true),
-        entregador: faker.person.fullName(),
-        taxa: faker.number.float({min: 8, max: 20, multipleOf: 0.5}),
-        valorExtra: faker.number.float({min: 50, max: 200, multipleOf: 0.1}),
+        descricao: `Entrega para ${faker.person.firstName()}`,
+        entregadorId: faker.string.uuid(),
+        entregadorNome: faker.person.fullName(),
+        taxaEntrega: faker.number.float({min: 8, max: 20, multipleOf: 0.5}),
+        taxasExtras: [],
+        valorRepasse: faker.number.float({min: 50, max: 200, multipleOf: 0.1}),
     }))
 }
 
@@ -79,9 +81,9 @@ const generateMockFaturas = (count: number): Fatura[] => {
             totalEntregas: entregas.length,
             dataEmissao,
             dataVencimento: addDays(new Date(2025, 5, 15), i * 3),
-            valorTaxas: entregas.reduce((sum, e) => sum + e.taxa, 0),
+            valorTaxas: entregas.reduce((sum, e) => sum + e.taxaEntrega, 0),
             statusTaxas,
-            valorRepasse: entregas.reduce((sum, e) => sum + e.valorExtra, 0),
+            valorRepasse: entregas.reduce((sum, e) => sum + e.valorRepasse, 0),
             statusRepasse,
             statusGeral,
             observacoes: `Fatura referente ao período de ${faker.date.month({ abbreviated: false })}.`,
@@ -91,6 +93,17 @@ const generateMockFaturas = (count: number): Fatura[] => {
     });
 };
 
+const recalculateFaturaTotals = (fatura: Fatura): Fatura => {
+    const valorTaxas = fatura.entregas.reduce((sum, e) => {
+        const taxasExtrasValor = e.taxasExtras.reduce((subSum, te) => subSum + te.valor, 0);
+        return sum + e.taxaEntrega + taxasExtrasValor;
+    }, 0);
+    const valorRepasse = fatura.entregas.reduce((sum, e) => sum + e.valorRepasse, 0);
+    
+    return { ...fatura, valorTaxas, valorRepasse, totalEntregas: fatura.entregas.length };
+};
+
+
 export const useFaturasData = () => {
     const [faturas, setFaturas] = useState<Fatura[]>(() => loadFromStorage('app_faturas', generateMockFaturas(6)));
     const [loading, setLoading] = useState(false);
@@ -99,66 +112,60 @@ export const useFaturasData = () => {
         saveToStorage('app_faturas', faturas);
     }, [faturas]);
 
-    const addEntregaToFatura = (solicitacao: Solicitacao, conciliacao: ConciliacaoData, formasPagamento: FormaPagamentoConciliacao[]) => {
-        let debitosTaxa = 0;
-        let creditosRepasse = 0;
-
-        Object.values(conciliacao).forEach(rotaConciliada => {
-            rotaConciliada.pagamentosTaxa.forEach(pagamento => {
-                const forma = formasPagamento.find(f => f.id === pagamento.formaPagamentoId);
-                if (forma?.acaoFaturamento === 'GERAR_DEBITO_TAXA') {
-                    debitosTaxa += pagamento.valor;
-                }
-            });
-            rotaConciliada.pagamentosRepasse.forEach(pagamento => {
-                const forma = formasPagamento.find(f => f.id === pagamento.formaPagamentoId);
-                if (forma?.acaoFaturamento === 'GERAR_CREDITO_REPASSE') {
-                    creditosRepasse += pagamento.valor;
-                }
-            });
-        });
-        
-        if (debitosTaxa === 0 && creditosRepasse === 0) {
-            return; // No financial impact, no invoice needed
+    const addEntregaToFaturaFromSolicitacao = (solicitacao: Solicitacao, taxasExtras: TaxaExtra[]) => {
+        if (!solicitacao || solicitacao.rotas.length === 0 || !solicitacao.clienteId) {
+            return;
         }
 
         setFaturas(prevFaturas => {
             const faturasClone = [...prevFaturas];
             let faturaAberta = faturasClone.find(f => f.clienteId === solicitacao.clienteId && f.statusGeral === 'Aberta');
 
-            const novasEntregas = solicitacao.rotas.map(r => ({
-                id: r.id,
-                data: solicitacao.dataSolicitacao,
-                endereco: `Bairro: ${r.bairroDestinoId}`, // Placeholder
-                entregador: solicitacao.entregadorNome || 'N/A',
-                taxa: r.taxaEntrega,
-                valorExtra: r.valorExtra || 0,
-            }));
+            const novasEntregas: EntregaIncluida[] = solicitacao.rotas.map(rota => {
+                const taxasExtrasDaRota = (rota.taxasExtrasIds || [])
+                    .map(id => taxasExtras.find(te => te.id === id))
+                    .filter((te): te is TaxaExtra => !!te)
+                    .map(te => ({ nome: te.nome, valor: te.valor }));
+
+                return {
+                    id: rota.id,
+                    data: solicitacao.dataSolicitacao,
+                    descricao: `Entrega para ${rota.responsavel} (Ref: ${solicitacao.codigo})`,
+                    entregadorId: solicitacao.entregadorId,
+                    entregadorNome: solicitacao.entregadorNome,
+                    taxaEntrega: rota.taxaEntrega,
+                    taxasExtras: taxasExtrasDaRota,
+                    valorRepasse: rota.valorExtra || 0,
+                };
+            });
 
             if (faturaAberta) {
                 faturaAberta.entregas.push(...novasEntregas);
-                faturaAberta.valorTaxas += debitosTaxa;
-                faturaAberta.valorRepasse += creditosRepasse;
-                faturaAberta.totalEntregas = faturaAberta.entregas.length;
+                const updatedFatura = recalculateFaturaTotals(faturaAberta);
+                const index = faturasClone.findIndex(f => f.id === faturaAberta!.id);
+                if (index !== -1) {
+                    faturasClone[index] = updatedFatura;
+                }
             } else {
                 const novaFatura: Fatura = {
                     id: faker.string.uuid(),
-                    numero: `FAT-2025-00${faturasClone.length + 1}`,
+                    numero: `FAT-${new Date().getFullYear()}-00${faturasClone.length + 1}`,
                     clienteId: solicitacao.clienteId,
                     clienteNome: solicitacao.clienteNome,
                     tipoFaturamento: 'Manual',
-                    totalEntregas: novasEntregas.length,
+                    totalEntregas: 0, // Will be calculated
                     dataEmissao: new Date(),
                     dataVencimento: addDays(new Date(), 30),
-                    valorTaxas: debitosTaxa,
-                    statusTaxas: debitosTaxa > 0 ? 'Pendente' : 'Paga',
-                    valorRepasse: creditosRepasse,
-                    statusRepasse: creditosRepasse > 0 ? 'Pendente' : 'Repassado',
+                    valorTaxas: 0, // Will be calculated
+                    statusTaxas: 'Pendente',
+                    valorRepasse: 0, // Will be calculated
+                    statusRepasse: 'Pendente',
                     statusGeral: 'Aberta',
                     entregas: novasEntregas,
                     historico: [{ id: faker.string.uuid(), acao: 'criada', data: new Date() }],
+                    observacoes: `Fatura gerada automaticamente em ${format(new Date(), 'dd/MM/yyyy')}`
                 };
-                faturasClone.push(novaFatura);
+                faturasClone.push(recalculateFaturaTotals(novaFatura));
             }
             return faturasClone;
         });
@@ -206,5 +213,36 @@ export const useFaturasData = () => {
         setFaturas(prev => prev.filter(f => f.id !== id));
     };
 
-    return { faturas, loading, addEntregaToFatura, deleteFatura, registrarPagamentoTaxa, registrarPagamentoRepasse };
+    const addEntregaToFatura = (faturaId: string, entregaData: Omit<EntregaIncluida, 'id'>) => {
+        setFaturas(prev => prev.map(f => {
+            if (f.id === faturaId) {
+                const newEntrega = { ...entregaData, id: faker.string.uuid() };
+                const updatedEntregas = [...f.entregas, newEntrega];
+                return recalculateFaturaTotals({ ...f, entregas: updatedEntregas });
+            }
+            return f;
+        }));
+    };
+
+    const updateEntregaInFatura = (faturaId: string, entregaId: string, entregaData: Partial<Omit<EntregaIncluida, 'id'>>) => {
+        setFaturas(prev => prev.map(f => {
+            if (f.id === faturaId) {
+                const updatedEntregas = f.entregas.map(e => e.id === entregaId ? { ...e, ...entregaData } : e);
+                return recalculateFaturaTotals({ ...f, entregas: updatedEntregas });
+            }
+            return f;
+        }));
+    };
+
+    const deleteEntregaFromFatura = (faturaId: string, entregaId: string) => {
+        setFaturas(prev => prev.map(f => {
+            if (f.id === faturaId) {
+                const updatedEntregas = f.entregas.filter(e => e.id !== entregaId);
+                return recalculateFaturaTotals({ ...f, entregas: updatedEntregas });
+            }
+            return f;
+        }));
+    };
+
+    return { faturas, loading, addEntregaToFatura: addEntregaToFaturaFromSolicitacao, deleteFatura, registrarPagamentoTaxa, registrarPagamentoRepasse, addManualEntregaToFatura: addEntregaToFatura, updateManualEntregaInFatura: updateEntregaInFatura, deleteManualEntregaFromFatura: deleteEntregaFromFatura };
 };

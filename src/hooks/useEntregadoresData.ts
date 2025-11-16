@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Entregador } from '@/types';
 import { faker } from '@faker-js/faker';
+import { initialEntregadores } from '@/lib/mockData';
 
 // --- LocalStorage Helper ---
 function loadFromStorage<T>(key: string, defaultValue: T): T {
@@ -21,41 +22,8 @@ function saveToStorage<T>(key: string, value: T) {
     }
 }
 
-const generateMockEntregadores = (): Entregador[] => {
-    return [
-        {
-            id: 'entregador-1',
-            nome: 'Ana Silva',
-            documento: '11122233344',
-            email: 'ana.silva@entregas.com',
-            telefone: '(11) 98765-4321',
-            cidade: 'São Paulo',
-            bairro: 'Pinheiros',
-            veiculo: 'Moto - Honda CG 160',
-            status: 'ativo',
-            tipoComissao: 'percentual',
-            valorComissao: 10,
-            avatar: `https://api.dicebear.com/7.x/initials/svg?seed=Ana+Silva`,
-        },
-        {
-            id: 'entregador-2',
-            nome: 'Carlos Souza',
-            documento: '55566677788',
-            email: 'carlos.souza@entregas.com',
-            telefone: '(11) 91234-5678',
-            cidade: 'São Paulo',
-            bairro: 'Vila Madalena',
-            veiculo: 'Carro - Fiat Fiorino',
-            status: 'ativo',
-            tipoComissao: 'fixo',
-            valorComissao: 7.5,
-            avatar: `https://api.dicebear.com/7.x/initials/svg?seed=Carlos+Souza`,
-        },
-    ];
-};
-
 export const useEntregadoresData = () => {
-    const [entregadores, setEntregadores] = useState<Entregador[]>(() => loadFromStorage('app_entregadores', generateMockEntregadores()));
+    const [entregadores, setEntregadores] = useState<Entregador[]>(() => loadFromStorage('app_entregadores', initialEntregadores));
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {

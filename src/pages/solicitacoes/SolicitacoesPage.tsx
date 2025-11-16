@@ -59,7 +59,7 @@ const tabs: { value: SolicitacaoStatus | 'todas', label: string }[] = [
 export const SolicitacoesPage: React.FC = () => {
     const { solicitacoes, loading, addSolicitacao, updateSolicitacao, updateStatusSolicitacao, deleteSolicitacao, updateConciliacao } = useSolicitacoesData();
     const { clients } = useClientsData();
-    const { formasPagamentoConciliacao } = useSettingsData();
+    const { formasPagamentoConciliacao, taxasExtras } = useSettingsData();
     const { clearSolicitacoesNotifications } = useNotification();
     const [isLaunchModalOpen, setIsLaunchModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<SolicitacaoStatus | 'todas'>('aceita');
@@ -118,7 +118,7 @@ export const SolicitacoesPage: React.FC = () => {
         if (solicitacaoToConciliate) {
             const cliente = clients.find(c => c.id === solicitacaoToConciliate.clienteId);
             if (solicitacaoToConciliate.status === 'em_andamento') {
-                updateStatusSolicitacao(solicitacaoToConciliate.id, 'concluida', { cliente, conciliacao: conciliacaoData, formasPagamento: formasPagamentoConciliacao });
+                updateStatusSolicitacao(solicitacaoToConciliate.id, 'concluida', { cliente, conciliacao: conciliacaoData, formasPagamento: formasPagamentoConciliacao, taxasExtras });
                 toast.success(`Solicitação ${solicitacaoToConciliate.codigo} conciliada e finalizada!`);
             } else {
                 updateConciliacao(solicitacaoToConciliate.id, conciliacaoData);

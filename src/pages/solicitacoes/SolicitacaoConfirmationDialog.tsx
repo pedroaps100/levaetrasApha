@@ -16,13 +16,13 @@ interface SolicitacaoConfirmationDialogProps {
 }
 
 export const SolicitacaoConfirmationDialog: React.FC<SolicitacaoConfirmationDialogProps> = ({ isOpen, onClose, solicitacaoData, onConfirm }) => {
-    const { bairros, paymentMethods } = useSettingsData();
+    const { bairros, paymentMethods, taxasExtras } = useSettingsData();
 
     const formatCurrency = (value: number | undefined) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
     if (!solicitacaoData) return null;
 
-    const totalAReceber = (solicitacaoData.valorTotalTaxas || 0) + (solicitacaoData.valorTotalRepasse || 0);
+    const totalAReceber = (solicitacaoData.valorTotalTaxas || 0) + (solicitacaoData.valorTotalRepasse || 0) + (solicitacaoData.valorTotalTaxasExtras || 0);
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -54,7 +54,10 @@ export const SolicitacaoConfirmationDialog: React.FC<SolicitacaoConfirmationDial
                         <div className="space-y-3">
                             {solicitacaoData.rotas.map((rota) => {
                                 const bairro = bairros.find(b => b.id === rota.bairroDestinoId);
-                                const subtotalRota = (rota.taxaEntrega || 0) + (rota.valorExtra || 0);
+                                const taxasExtrasDaRota = taxasExtras.filter(te => rota.taxasExtrasIds?.includes(te.id));
+                                const valorTaxasExtrasDaRota = taxasExtrasDaRota.reduce((sum, te) => sum + te.valor, 0);
+                                const subtotalRota = (rota.taxaEntrega || 0) + (rota.valorExtra || 0) + valorTaxasExtrasDaRota;
+
                                 return (
                                     <div key={rota.id} className="p-3 border rounded-lg space-y-2">
                                         <p className="font-semibold">Rota: {bairro?.nome}</p>
@@ -62,6 +65,18 @@ export const SolicitacaoConfirmationDialog: React.FC<SolicitacaoConfirmationDial
                                         <p className="text-sm"><span className="text-muted-foreground">Telefone:</span> {rota.telefone}</p>
                                         {rota.observacoes && <p className="text-sm"><span className="text-muted-foreground">Observações:</span> {rota.observacoes}</p>}
                                         <p className="text-sm"><span className="text-muted-foreground">Taxa:</span> {formatCurrency(rota.taxaEntrega)}</p>
+                                        
+                                        {taxasExtrasDaRota.length > 0 && (
+                                            <div className="text-sm">
+                                                <span className="text-muted-foreground">Taxas Extras:</span>
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {taxasExtrasDaRota.map(te => (
+                                                        <Badge key={te.id} variant="outline">{te.nome} ({formatCurrency(te.valor)})</Badge>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {rota.receberDoCliente && (
                                             <div className="pt-2 border-t mt-2">
                                                 <p className="text-sm font-semibold text-primary">Receber do Cliente Final</p>
@@ -83,8 +98,9 @@ export const SolicitacaoConfirmationDialog: React.FC<SolicitacaoConfirmationDial
                     </div>
                      <Separator />
                      <div className="space-y-2 pt-2">
-                        <div className="flex justify-between"><span>Valor Total das Entregas (Taxas):</span><span>{formatCurrency(solicitacaoData.valorTotalTaxas)}</span></div>
-                        <div className="flex justify-between"><span>Valor Total dos Produtos (Repasse):</span><span>{formatCurrency(solicitacaoData.valorTotalRepasse)}</span></div>
+                        <div className="flex justify-between"><span>Total Taxas de Entrega:</span><span>{formatCurrency(solicitacaoData.valorTotalTaxas)}</span></div>
+                        {solicitacaoData.valorTotalTaxasExtras > 0 && <div className="flex justify-between"><span>Total Taxas Extras:</span><span>{formatCurrency(solicitacaoData.valorTotalTaxasExtras)}</span></div>}
+                        <div className="flex justify-between"><span>Total Produtos (Repasse):</span><span>{formatCurrency(solicitacaoData.valorTotalRepasse)}</span></div>
                         <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2"><span>Total a Receber do Cliente Final:</span><span>{formatCurrency(totalAReceber)}</span></div>
                      </div>
                 </div>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -33,10 +33,19 @@ const statusRepasseConfig: Record<FaturaStatusRepasse, { label: string; badgeCla
 };
 
 export const FaturasFinalizadasPage: React.FC = () => {
-    const { faturas, loading, deleteFatura, registrarPagamentoTaxa, registrarPagamentoRepasse } = useFaturasData();
+    const { faturas, loading, deleteFatura, registrarPagamentoTaxa, registrarPagamentoRepasse, addManualEntregaToFatura, updateManualEntregaInFatura, deleteManualEntregaFromFatura } = useFaturasData();
     const [searchTerm, setSearchTerm] = useState('');
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [selectedFatura, setSelectedFatura] = useState<Fatura | null>(null);
+
+    useEffect(() => {
+        if (selectedFatura && isDetailsOpen) {
+            const updatedFatura = faturas.find(f => f.id === selectedFatura.id);
+            if (updatedFatura) {
+                setSelectedFatura(updatedFatura);
+            }
+        }
+    }, [faturas, selectedFatura, isDetailsOpen]);
 
     const handleViewDetails = (fatura: Fatura) => {
         setSelectedFatura(fatura);
@@ -177,6 +186,9 @@ export const FaturasFinalizadasPage: React.FC = () => {
                 fatura={selectedFatura}
                 onRegisterTaxPayment={registrarPagamentoTaxa}
                 onRegisterRepassePayment={registrarPagamentoRepasse}
+                onAddEntrega={addManualEntregaToFatura}
+                onUpdateEntrega={updateManualEntregaInFatura}
+                onDeleteEntrega={deleteManualEntregaFromFatura}
             />
         </div>
     );

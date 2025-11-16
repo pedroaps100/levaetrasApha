@@ -11,6 +11,8 @@ import { AddressesTab } from './AddressesTab';
 import { WalletTab } from './WalletTab';
 import { RechargesHistoryTab } from './RechargesHistoryTab';
 import { LivroCaixaTab } from './LivroCaixaTab';
+import { AccessTab } from './AccessTab';
+import { KeyRound } from 'lucide-react';
 
 interface ClientProfileModalProps {
   open: boolean;
@@ -26,8 +28,9 @@ export const ClientProfileModal: React.FC<ClientProfileModalProps> = ({ open, on
   const content = (
     <Tabs defaultValue="info" className="flex flex-col h-full">
         <div className="w-full overflow-x-auto pb-2">
-            <TabsList className="grid w-full grid-cols-3 sm:w-auto sm:inline-flex sm:grid-cols-8">
+            <TabsList className="grid w-full grid-cols-3 sm:w-auto sm:inline-flex sm:grid-cols-9">
                 <TabsTrigger value="info" className="flex-shrink-0">Informações</TabsTrigger>
+                <TabsTrigger value="access" className="flex-shrink-0 flex items-center gap-1"><KeyRound className="h-4 w-4"/>Acesso</TabsTrigger>
                 <TabsTrigger value="livro-caixa" className="flex-shrink-0">Livro Caixa</TabsTrigger>
                 <TabsTrigger value="requests" className="flex-shrink-0">Solicitações</TabsTrigger>
                 {isFaturado ? (
@@ -47,6 +50,7 @@ export const ClientProfileModal: React.FC<ClientProfileModalProps> = ({ open, on
         </div>
         <div className="flex-1 overflow-y-auto mt-4 pr-2">
             <TabsContent value="info"><InfoTab client={client} /></TabsContent>
+            <TabsContent value="access"><AccessTab client={client} /></TabsContent>
             <TabsContent value="livro-caixa"><LivroCaixaTab /></TabsContent>
             <TabsContent value="requests"><RequestsHistoryTab /></TabsContent>
             {isFaturado ? (

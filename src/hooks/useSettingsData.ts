@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Region, Bairro, PaymentMethod, User, Category, Cargo, FormaPagamentoConciliacao } from '@/types';
+import { Region, Bairro, PaymentMethod, User, Category, Cargo, FormaPagamentoConciliacao, TaxaExtra } from '@/types';
 import { faker } from '@faker-js/faker';
-import { ALL_PERMISSIONS } from '@/lib/permissions';
+import { initialUsers, initialCargos, generateInitialRegions, generateInitialBairros, generateInitialPaymentMethods, generateInitialFormasPagamentoConciliacao, generateInitialTaxasExtras, generateInitialCategories } from '@/lib/mockData';
 
 // --- LocalStorage Helper ---
 function loadFromStorage<T>(key: string, defaultValue: T): T {
@@ -22,73 +22,34 @@ function saveToStorage<T>(key: string, value: T) {
     }
 }
 
+// --- Data Versioning and Reset Logic ---
+const DATA_VERSION_KEY = 'app_data_version';
+const CURRENT_DATA_VERSION = '2.1'; // Increment this version to force a data reset for all users
 
-// --- Initial Data Generators ---
-const generateInitialRegions = (): Region[] => [
-    { id: 'zona-sul', name: 'Zona Sul' },
-    { id: 'zona-norte', name: 'Zona Norte' },
-    { id: 'zona-oeste', name: 'Zona Oeste' },
-    { id: 'zona-leste', name: 'Zona Leste' },
-    { id: 'centro', name: 'Centro' },
-];
+const checkAndResetData = () => {
+    const storedVersion = localStorage.getItem(DATA_VERSION_KEY);
 
-const generateInitialBairros = (): Bairro[] => [
-  { id: faker.string.uuid(), nome: 'Copacabana', taxa: 7.00, regionId: 'zona-sul' },
-  { id: faker.string.uuid(), nome: 'Ipanema', taxa: 8.50, regionId: 'zona-sul' },
-  { id: faker.string.uuid(), nome: 'Tijuca', taxa: 6.00, regionId: 'zona-norte' },
-  { id: faker.string.uuid(), nome: 'Barra da Tijuca', taxa: 12.00, regionId: 'zona-oeste' },
-  { id: faker.string.uuid(), nome: 'Tatuapé', taxa: 9.00, regionId: 'zona-leste' },
-  { id: faker.string.uuid(), nome: 'Sé', taxa: 5.00, regionId: 'centro' },
-];
-
-const generateInitialPaymentMethods = (): PaymentMethod[] => [
-    { id: faker.string.uuid(), name: 'Pix', enabled: true, description: 'Pagamentos instantâneos via Pix.' },
-    { id: faker.string.uuid(), name: 'Cartão de Crédito', enabled: false, description: 'Visa, Mastercard, etc. (requer gateway).' },
-    { id: faker.string.uuid(), name: 'Dinheiro na Entrega', enabled: true, description: 'Pagamento em espécie ao entregador.' },
-];
-
-const generateInitialFormasPagamentoConciliacao = (): FormaPagamentoConciliacao[] => [
-    { id: 'pix-levaetras', nome: 'PIX Leva e Trás', acaoFaturamento: 'NENHUMA' },
-    { id: 'dinheiro-levaetras', nome: 'Dinheiro Leva e Trás', acaoFaturamento: 'NENHUMA' },
-    { id: 'faturar-taxa', nome: 'Faturar Taxa (Pago pela Loja)', acaoFaturamento: 'GERAR_DEBITO_TAXA' },
-    { id: 'repassar-valor', nome: 'Repassar Valor (Recebido pela Leva e Trás)', acaoFaturamento: 'GERAR_CREDITO_REPASSE' },
-    { id: 'pix-loja', nome: 'PIX Loja (Resolvido)', acaoFaturamento: 'NENHUMA' },
-];
-
-const generateInitialCargos = (): Cargo[] => [
-    {
-        id: 'admin-master',
-        name: 'Administrador Master',
-        description: 'Acesso total a todas as funcionalidades do sistema.',
-        permissions: ALL_PERMISSIONS.map(p => p.id),
-    },
-    {
-        id: 'gerente-logistica',
-        name: 'Gerente de Logística',
-        description: 'Gerencia solicitações e entregadores, mas não tem acesso ao financeiro.',
-        permissions: ['dashboard:view', 'solicitacoes:view', 'solicitacoes:create', 'solicitacoes:edit', 'solicitacoes:manage_status', 'clientes:view', 'entregadores:view', 'entregadores:create', 'entregadores:edit', 'entregas:view'],
+    if (storedVersion !== CURRENT_DATA_VERSION) {
+        console.warn(`Data version mismatch. Stored: ${storedVersion}, Current: ${CURRENT_DATA_VERSION}. Resetting all application data.`);
+        
+        const keysToReset = [
+            'app_users', 'app_clients', 'app_entregadores', 'app_cargos', 
+            'app_regions', 'app_bairros', 'app_payment_methods', 
+            'app_formas_pagamento_conciliacao', 'app_taxas_extras', 'app_categories',
+            'app_solicitacoes', 'app_faturas', 'app_despesas', 'app_receitas', 'app_transactions',
+            'app_auth_user' // Also clear the logged-in user
+        ];
+        
+        keysToReset.forEach(key => localStorage.removeItem(key));
+        
+        localStorage.setItem(DATA_VERSION_KEY, CURRENT_DATA_VERSION);
+        return true; // Indicates that data was reset
     }
-];
+    return false; // No reset needed
+};
 
-const generateInitialUsers = (): User[] => [
-  { id: 'admin-1', nome: 'Ricardo Martins', email: 'ricardo@empresa.com', role: 'admin', cargoId: 'admin-master', avatar: `https://api.dicebear.com/7.x/initials/svg?seed=Ricardo+Martins` },
-  { id: 'admin-2', nome: 'Ana Silva', email: 'ana.silva@empresa.com', role: 'admin', cargoId: 'gerente-logistica', avatar: `https://api.dicebear.com/7.x/initials/svg?seed=Ana+Silva` },
-  { id: 'entregador-1', nome: 'Carlos Souza', email: 'carlos.souza@entregas.com', role: 'entregador', avatar: `https://api.dicebear.com/7.x/initials/svg?seed=Carlos+Souza` },
-  { id: 'client-1', nome: 'Padaria Pão Quente', email: 'padaria@email.com', role: 'cliente', avatar: `https://api.dicebear.com/7.x/initials/svg?seed=Padaria` },
-  { id: 'client-2', nome: 'Restaurante Sabor Divino', email: 'restaurante@email.com', role: 'cliente', avatar: `https://api.dicebear.com/7.x/initials/svg?seed=Restaurante` },
-];
-
-const generateInitialCategories = (): { receitas: Category[], despesas: Category[] } => ({
-  receitas: [
-    { id: faker.string.uuid(), name: 'Taxa de Entrega' },
-    { id: faker.string.uuid(), name: 'Venda de Produtos' },
-  ],
-  despesas: [
-    { id: faker.string.uuid(), name: 'Combustível' },
-    { id: faker.string.uuid(), name: 'Manutenção' },
-    { id: faker.string.uuid(), name: 'Alimentação' },
-  ],
-});
+// Execute the check once when the module is loaded
+checkAndResetData();
 
 
 // --- The Hook ---
@@ -98,8 +59,9 @@ export const useSettingsData = () => {
     const [bairros, setBairros] = useState<Bairro[]>(() => loadFromStorage('app_bairros', generateInitialBairros()));
     const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(() => loadFromStorage('app_payment_methods', generateInitialPaymentMethods()));
     const [formasPagamentoConciliacao, setFormasPagamentoConciliacao] = useState<FormaPagamentoConciliacao[]>(() => loadFromStorage('app_formas_pagamento_conciliacao', generateInitialFormasPagamentoConciliacao()));
-    const [users, setUsers] = useState<User[]>(() => loadFromStorage('app_users', generateInitialUsers()));
-    const [cargos, setCargos] = useState<Cargo[]>(() => loadFromStorage('app_cargos', generateInitialCargos()));
+    const [taxasExtras, setTaxasExtras] = useState<TaxaExtra[]>(() => loadFromStorage('app_taxas_extras', generateInitialTaxasExtras()));
+    const [users, setUsers] = useState<User[]>(() => loadFromStorage('app_users', initialUsers));
+    const [cargos, setCargos] = useState<Cargo[]>(() => loadFromStorage('app_cargos', initialCargos));
     const [categories, setCategories] = useState<{ receitas: Category[], despesas: Category[] }>(() => loadFromStorage('app_categories', generateInitialCategories()));
     const [loading, setLoading] = useState(false);
 
@@ -108,6 +70,7 @@ export const useSettingsData = () => {
     useEffect(() => { saveToStorage('app_bairros', bairros) }, [bairros]);
     useEffect(() => { saveToStorage('app_payment_methods', paymentMethods) }, [paymentMethods]);
     useEffect(() => { saveToStorage('app_formas_pagamento_conciliacao', formasPagamentoConciliacao) }, [formasPagamentoConciliacao]);
+    useEffect(() => { saveToStorage('app_taxas_extras', taxasExtras) }, [taxasExtras]);
     useEffect(() => { saveToStorage('app_users', users) }, [users]);
     useEffect(() => { saveToStorage('app_cargos', cargos) }, [cargos]);
     useEffect(() => { saveToStorage('app_categories', categories) }, [categories]);
@@ -116,7 +79,12 @@ export const useSettingsData = () => {
 
     // Users
     const addUser = (data: Omit<User, 'id' | 'avatar'>) => {
-        const newUser: User = { id: faker.string.uuid(), ...data, avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${data.nome}` };
+        const newUser: User = { 
+            id: faker.string.uuid(), 
+            ...data, 
+            password: data.password || 'password123', // Add default password
+            avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${data.nome}` 
+        };
         setUsers(prev => [...prev, newUser]);
     };
     const updateUser = (id: string, data: Partial<Omit<User, 'id' | 'avatar'>>) => {
@@ -195,6 +163,17 @@ export const useSettingsData = () => {
         setFormasPagamentoConciliacao(prev => prev.filter(f => f.id !== id));
     };
 
+    // Taxas Extras
+    const addTaxaExtra = (data: Omit<TaxaExtra, 'id'>) => {
+        setTaxasExtras(prev => [...prev, { id: faker.string.uuid(), ...data }]);
+    };
+    const updateTaxaExtra = (id: string, data: Partial<Omit<TaxaExtra, 'id'>>) => {
+        setTaxasExtras(prev => prev.map(t => t.id === id ? { ...t, ...data } : t));
+    };
+    const deleteTaxaExtra = (id: string) => {
+        setTaxasExtras(prev => prev.filter(t => t.id !== id));
+    };
+
     return {
         loading,
         users, addUser, updateUser, deleteUser,
@@ -205,5 +184,6 @@ export const useSettingsData = () => {
         paymentMethods, addPaymentMethod, updatePaymentMethod, togglePaymentMethod, deletePaymentMethod,
         enabledPaymentMethods: paymentMethods.filter(pm => pm.enabled),
         formasPagamentoConciliacao, addFormaPagamentoConciliacao, updateFormaPagamentoConciliacao, deleteFormaPagamentoConciliacao,
+        taxasExtras, addTaxaExtra, updateTaxaExtra, deleteTaxaExtra,
     };
 };

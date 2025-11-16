@@ -2,6 +2,7 @@ export interface User {
   id: string;
   nome: string;
   email: string;
+  password?: string;
   avatar?: string;
   role: 'admin' | 'entregador' | 'cliente';
   cargoId?: string;
@@ -98,10 +99,12 @@ export type FaturaStatusGeral = 'Aberta' | 'Fechada' | 'Paga' | 'Finalizada' | '
 export interface EntregaIncluida {
   id: string;
   data: Date;
-  endereco: string;
-  entregador: string;
-  taxa: number;
-  valorExtra: number;
+  descricao: string;
+  entregadorId?: string;
+  entregadorNome?: string;
+  taxaEntrega: number;
+  taxasExtras: { nome: string; valor: number }[];
+  valorRepasse: number;
 }
 
 export type HistoricoAcao = 'criada' | 'fechada' | 'pagamento_taxa' | 'pagamento_repasse' | 'finalizada';
@@ -132,6 +135,12 @@ export interface Fatura {
   historico: HistoricoItem[];
 }
 
+export interface TaxaExtra {
+  id: string;
+  nome: string;
+  valor: number;
+}
+
 export interface Rota {
   id: string;
   bairroDestinoId: string;
@@ -143,6 +152,7 @@ export interface Rota {
   meiosPagamentoAceitos?: string[];
   taxaEntrega: number;
   status: 'pendente' | 'coletada' | 'entregue' | 'falhou';
+  taxasExtrasIds?: string[];
 }
 
 export type SolicitacaoStatus = 'pendente' | 'aceita' | 'em_andamento' | 'concluida' | 'cancelada' | 'rejeitada';
@@ -164,6 +174,16 @@ export interface ConciliacaoData {
     [rotaId: string]: RotaConciliacao;
 }
 
+export type SolicitacaoAcao = 'criada' | 'editada' | 'aceita' | 'rejeitada' | 'iniciada' | 'conciliada' | 'cancelada';
+export interface SolicitacaoHistoricoItem {
+  id: string;
+  data: Date;
+  acao: SolicitacaoAcao;
+  usuarioId: string;
+  usuarioNome: string;
+  detalhes?: string;
+}
+
 export interface Solicitacao {
   id: string;
   codigo: string;
@@ -181,8 +201,10 @@ export interface Solicitacao {
   rotas: Rota[];
   valorTotalTaxas: number;
   valorTotalRepasse: number;
+  valorTotalTaxasExtras?: number;
   justificativa?: string;
   conciliacao?: ConciliacaoData;
+  historico?: SolicitacaoHistoricoItem[];
 }
 
 

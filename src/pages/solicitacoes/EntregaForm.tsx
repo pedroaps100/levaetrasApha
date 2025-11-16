@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -17,6 +17,8 @@ import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
 import { ClientInfoDisplay } from './ClientInfoDisplay';
 import { faker } from '@faker-js/faker';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const rotaSchema = z.object({
     id: z.string(),
@@ -27,6 +29,7 @@ const rotaSchema = z.object({
     observacoes: z.string().optional(),
     taxaEntrega: z.number().default(0),
     valorExtra: z.coerce.number().optional(),
+    taxasExtrasIds: z.array(z.string()).optional(),
 });
 
 const formSchema = z.object({
@@ -51,13 +54,15 @@ const createNewRota = (): z.infer<typeof rotaSchema> => ({
     telefone: '',
     observacoes: '',
     taxaEntrega: 0,
+    taxasExtrasIds: [],
 });
 
 export const EntregaForm: React.FC<EntregaFormProps> = ({ onClose, onFormSubmit, operationLabel, solicitacaoToEdit }) => {
     const { clients, addClient, loading: clientsLoading } = useClientsData();
-    const { regions, bairros, loading: settingsLoading } = useSettingsData();
+    const { regions, bairros, taxasExtras, loading: settingsLoading } = useSettingsData();
     const [isQuickClientOpen, setIsQuickClientOpen] = useState(false);
     const [confirmationData, setConfirmationData] = useState<SolicitacaoFormData | null>(null);
+    const [showExtraFees, setShowExtraFees] = useState<Record<number, boolean>>({});
 
     const form = useForm<EntregaFormValues>({
         resolver: zodResolver(formSchema),
@@ -103,6 +108,11 @@ export const EntregaForm: React.FC<EntregaFormProps> = ({ onClose, onFormSubmit,
         if (!client) return;
         
         const valorTotalTaxas = data.rotas.reduce((sum, rota) => sum + (rota.taxaEntrega || 0), 0);
+        const valorTotalTaxasExtras = data.rotas.reduce((sum, rota) => {
+            const taxasSelecionadas = taxasExtras.filter(te => rota.taxasExtrasIds?.includes(te.id));
+            const valorDasTaxas = taxasSelecionadas.reduce((subSum, te) => subSum + te.valor, 0);
+            return sum + valorDasTaxas;
+        }, 0);
         const rotasCompletas: Rota[] = data.rotas.map(r => ({ ...r, status: 'pendente', receberDoCliente: false, valorExtra: 0 }));
 
         setConfirmationData({
@@ -114,6 +124,7 @@ export const EntregaForm: React.FC<EntregaFormProps> = ({ onClose, onFormSubmit,
             pontoColeta: "Múltiplos pontos de coleta",
             rotas: rotasCompletas,
             valorTotalTaxas,
+            valorTotalTaxasExtras,
             valorTotalRepasse: 0,
         });
     };
@@ -207,7 +218,18 @@ export const EntregaForm: React.FC<EntregaFormProps> = ({ onClose, onFormSubmit,
                                                 <FormField control={form.control} name={`rotas.${index}.responsavel`} render={({ field }) => (<FormItem><FormLabel>Remetente</FormLabel><FormControl><Input placeholder="Nome de quem vai enviar" {...field} /></FormControl><FormMessage /></FormItem>)} />
                                                 <FormField control={form.control} name={`rotas.${index}.telefone`} render={({ field }) => (<FormItem><FormLabel>Telefone</FormLabel><FormControl><Input placeholder="(11) 99999-9999" {...field} /></FormControl><FormMessage /></FormItem>)} />
                                             </div>
-                                             <FormField control={form.control} name={`rotas.${index}.observacoes`} render={({ field }) => (<FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea placeholder="Ex: Procurar por João na recepção" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                                            <FormField control={form.control} name={`rotas.${index}.observacoes`} render={({ field }) => (<FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea placeholder="Ex: Procurar por João na recepção" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                                            
+                                            <div className="flex flex-row items-center space-x-3 space-y-0 rounded-md py-2">
+                                                <Checkbox checked={showExtraFees[index]} onCheckedChange={(checked) => { setShowExtraFees(prev => ({ ...prev, [index]: !!checked })); if (!checked) { form.setValue(`rotas.${index}.taxasExtrasIds`, []); } }} id={`entrega-mostrar-taxas-${index}`} />
+                                                <Label htmlFor={`entrega-mostrar-taxas-${index}`} className="font-normal">Adicionar Taxas Extras?</Label>
+                                            </div>
+
+                                            {showExtraFees[index] && (
+                                                <div className="p-4 bg-muted/50 rounded-lg space-y-4">
+                                                    <FormField control={form.control} name={`rotas.${index}.taxasExtrasIds`} render={() => ( <FormItem> <div className="mb-2"><FormLabel>Taxas Disponíveis</FormLabel></div> <div className="flex flex-wrap gap-x-4 gap-y-2"> {taxasExtras.map((item) => ( <FormField key={item.id} control={form.control} name={`rotas.${index}.taxasExtrasIds`} render={({ field }) => ( <FormItem key={item.id} className="flex flex-row items-center space-x-2 space-y-0"> <FormControl><Checkbox checked={field.value?.includes(item.id)} onCheckedChange={(checked) => { return checked ? field.onChange([...(field.value || []), item.id]) : field.onChange(field.value?.filter((value) => value !== item.id)) }} /></FormControl> <FormLabel className="font-normal">{item.nome} (+{item.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})</FormLabel> </FormItem> )} /> ))} </div> <FormMessage /> </FormItem> )} />
+                                                </div>
+                                            )}
                                         </div>
                                     )
                                 })}

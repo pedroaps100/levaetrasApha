@@ -4,15 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Fatura, FaturaStatusGeral, FaturaStatusPagamento, FaturaStatusRepasse } from '@/types';
+import { Fatura, FaturaStatusGeral, FaturaStatusPagamento, FaturaStatusRepasse, EntregaIncluida } from '@/types';
 import { format } from 'date-fns';
-import { ArrowUp, ArrowDown, Printer, Mail, PlusCircle } from 'lucide-react';
+import { ArrowUp, ArrowDown, Printer, Mail, PlusCircle, CheckCircle, Eye, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { RegistrarPagamentoTaxaModal } from './RegistrarPagamentoTaxaModal';
 import { RegistrarPagamentoRepasseModal } from './RegistrarPagamentoRepasseModal';
 import { HistoricoAcoesTab } from './HistoricoAcoesTab';
+import { AdicionarEntregaModal, EntregaManualFormData } from './AdicionarEntregaModal';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const statusGeralConfig: Record<FaturaStatusGeral, { label: string; badgeClass: string; }> = {
     Aberta: { label: 'Aberta', badgeClass: 'bg-blue-100 text-blue-800 border-blue-200' },
@@ -47,19 +50,40 @@ interface FaturaDetailsModalProps {
     fatura: Fatura | null;
     onRegisterTaxPayment: (faturaId: string, detalhes: string) => void;
     onRegisterRepassePayment: (faturaId: string, detalhes: string) => void;
+    onAddEntrega: (faturaId: string, data: EntregaManualFormData) => void;
+    onUpdateEntrega: (faturaId: string, entregaId: string, data: Partial<EntregaManualFormData>) => void;
+    onDeleteEntrega: (faturaId: string, entregaId: string) => void;
 }
 
-export const FaturaDetailsModal: React.FC<FaturaDetailsModalProps> = ({ isOpen, onClose, fatura, onRegisterTaxPayment, onRegisterRepassePayment }) => {
+export const FaturaDetailsModal: React.FC<FaturaDetailsModalProps> = ({ isOpen, onClose, fatura, onRegisterTaxPayment, onRegisterRepassePayment, onAddEntrega, onUpdateEntrega, onDeleteEntrega }) => {
   const [isTaxPaymentModalOpen, setIsTaxPaymentModalOpen] = useState(false);
   const [isRepassePaymentModalOpen, setIsRepassePaymentModalOpen] = useState(false);
+  const [isEntregaModalOpen, setIsEntregaModalOpen] = useState(false);
+  const [entregaToEdit, setEntregaToEdit] = useState<EntregaIncluida | null>(null);
+  const [isViewOnly, setIsViewOnly] = useState(false);
 
   const faturaMemo = useMemo(() => fatura, [isOpen, fatura]);
 
+  const { valorFinal, eRepasse, isQuitado } = useMemo(() => {
+    if (!faturaMemo) return { valorFinal: 0, eRepasse: false, isQuitado: false };
+
+    const repassePendente = faturaMemo.statusRepasse === 'Pendente' ? faturaMemo.valorRepasse : 0;
+    const taxasPendentes = ['Pendente', 'Vencida'].includes(faturaMemo.statusTaxas) ? faturaMemo.valorTaxas : 0;
+    
+    const finalValue = repassePendente - taxasPendentes;
+    
+    const quitado = Math.abs(finalValue) < 0.01 && (faturaMemo.statusGeral === 'Finalizada' || (faturaMemo.statusTaxas === 'Paga' && faturaMemo.statusRepasse === 'Repassado'));
+
+    return {
+        valorFinal: finalValue,
+        eRepasse: finalValue > 0,
+        isQuitado: quitado
+    };
+  }, [faturaMemo]);
+
   if (!faturaMemo) return null;
 
-  const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  const valorFinal = faturaMemo.valorRepasse - faturaMemo.valorTaxas;
-  const eRepasse = valorFinal > 0;
+  const formatCurrency = (value: number | undefined) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const handleTaxPaymentSuccess = (detalhes: string) => {
     onRegisterTaxPayment(faturaMemo.id, detalhes);
@@ -69,6 +93,20 @@ export const FaturaDetailsModal: React.FC<FaturaDetailsModalProps> = ({ isOpen, 
   const handleRepassePaymentSuccess = (detalhes: string) => {
     onRegisterRepassePayment(faturaMemo.id, detalhes);
     setIsRepassePaymentModalOpen(false);
+  };
+
+  const handleOpenEntregaModal = (entrega: EntregaIncluida | null, viewOnly: boolean) => {
+    setEntregaToEdit(entrega);
+    setIsViewOnly(viewOnly);
+    setIsEntregaModalOpen(true);
+  };
+
+  const handleEntregaSubmit = (faturaId: string, data: EntregaManualFormData, entregaId?: string) => {
+    if (entregaId) {
+        onUpdateEntrega(faturaId, entregaId, data);
+    } else {
+        onAddEntrega(faturaId, data);
+    }
   };
 
   return (
@@ -123,12 +161,25 @@ export const FaturaDetailsModal: React.FC<FaturaDetailsModalProps> = ({ isOpen, 
                       <p className="font-semibold">{faturaMemo.totalEntregas}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-muted-foreground">{eRepasse ? 'A Repassar ao Cliente' : 'A Receber do Cliente'}</p>
-                      <p className={`font-bold text-xl flex items-center gap-1 justify-end ${eRepasse ? 'text-green-600' : 'text-red-600'}`}>
-                        {eRepasse ? <ArrowUp className="h-5 w-5" /> : <ArrowDown className="h-5 w-5" />}
-                        {formatCurrency(Math.abs(valorFinal))}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{eRepasse ? 'Você deve repassar' : 'Você deve receber'}</p>
+                        {isQuitado ? (
+                            <>
+                                <p className="text-sm text-muted-foreground">Saldo Final</p>
+                                <p className="font-bold text-xl flex items-center gap-1 justify-end text-green-600">
+                                    <CheckCircle className="h-5 w-5" />
+                                    {formatCurrency(0)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">Fatura quitada</p>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-sm text-muted-foreground">{eRepasse ? 'A Repassar ao Cliente' : 'A Receber do Cliente'}</p>
+                                <p className={`font-bold text-xl flex items-center gap-1 justify-end ${eRepasse ? 'text-green-600' : 'text-red-600'}`}>
+                                    {eRepasse ? <ArrowUp className="h-5 w-5" /> : <ArrowDown className="h-5 w-5" />}
+                                    {formatCurrency(Math.abs(valorFinal))}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{eRepasse ? 'Você deve repassar' : 'Você deve receber'}</p>
+                            </>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -145,19 +196,44 @@ export const FaturaDetailsModal: React.FC<FaturaDetailsModalProps> = ({ isOpen, 
                         </TabsList>
                     </div>
                     <TabsContent value="entregas" className="flex-1 overflow-y-auto mt-4">
-                        <h3 className="font-semibold mb-4 text-base">Entregas Incluídas</h3>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-semibold text-base">Entregas Incluídas</h3>
+                            <Button size="sm" onClick={() => handleOpenEntregaModal(null, false)}><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Entrega Avulsa</Button>
+                        </div>
                         <div className="border rounded-lg">
                             <Table>
-                                <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Data</TableHead><TableHead>Endereço</TableHead><TableHead>Entregador</TableHead><TableHead>Taxa</TableHead><TableHead>Valor Extra</TableHead></TableRow></TableHeader>
+                                <TableHeader><TableRow><TableHead>Descrição</TableHead><TableHead>Data</TableHead><TableHead>Entregador</TableHead><TableHead>Taxa</TableHead><TableHead>Extras</TableHead><TableHead>Repasse</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
                                 <TableBody>
                                     {faturaMemo.entregas.map(e => (
                                         <TableRow key={e.id}>
-                                            <TableCell>{e.id}</TableCell>
+                                            <TableCell>{e.descricao}</TableCell>
                                             <TableCell>{format(e.data, 'dd/MM/yyyy')}</TableCell>
-                                            <TableCell>{e.endereco}</TableCell>
-                                            <TableCell>{e.entregador}</TableCell>
-                                            <TableCell>{formatCurrency(e.taxa)}</TableCell>
-                                            <TableCell>{formatCurrency(e.valorExtra)}</TableCell>
+                                            <TableCell>{e.entregadorNome || 'N/A'}</TableCell>
+                                            <TableCell>{formatCurrency(e.taxaEntrega)}</TableCell>
+                                            <TableCell>
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <span>{formatCurrency((e.taxasExtras || []).reduce((s, t) => s + t.valor, 0))}</span>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            {(e.taxasExtras || []).length > 0 ? (e.taxasExtras || []).map(te => <p key={te.nome}>{te.nome}: {formatCurrency(te.valor)}</p>) : <p>Sem taxas extras</p>}
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            </TableCell>
+                                            <TableCell>{formatCurrency(e.valorRepasse)}</TableCell>
+                                            <TableCell className="text-right">
+                                                <Button variant="ghost" size="icon" onClick={() => handleOpenEntregaModal(e, true)}><Eye className="h-4 w-4" /></Button>
+                                                <Button variant="ghost" size="icon" onClick={() => handleOpenEntregaModal(e, false)}><Pencil className="h-4 w-4" /></Button>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-red-500"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader><AlertDialogTitle>Confirmar exclusão</AlertDialogTitle><AlertDialogDescription>Deseja remover a entrega "{e.descricao}" da fatura?</AlertDialogDescription></AlertDialogHeader>
+                                                        <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => onDeleteEntrega(faturaMemo.id, e.id)}>Remover</AlertDialogAction></AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -226,6 +302,14 @@ export const FaturaDetailsModal: React.FC<FaturaDetailsModalProps> = ({ isOpen, 
         onClose={() => setIsRepassePaymentModalOpen(false)}
         fatura={faturaMemo}
         onSuccess={handleRepassePaymentSuccess}
+      />
+      <AdicionarEntregaModal
+        isOpen={isEntregaModalOpen}
+        onClose={() => setIsEntregaModalOpen(false)}
+        faturaId={faturaMemo.id}
+        entregaToEdit={entregaToEdit}
+        onFormSubmit={handleEntregaSubmit}
+        viewOnly={isViewOnly}
       />
     </>
   );

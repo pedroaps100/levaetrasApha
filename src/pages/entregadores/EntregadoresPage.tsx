@@ -12,17 +12,25 @@ import { PlusCircle, Search, Trash2, Pencil, Eye, Users, UserCheck, Truck, Clock
 import { Entregador } from '@/types';
 import { useEntregadoresData } from '@/hooks/useEntregadoresData';
 import { EntregadorFormDialog } from './EntregadorFormDialog';
+import { EntregadorProfileModal } from './profile/EntregadorProfileModal';
 
 export const EntregadoresPage: React.FC = () => {
     const { entregadores, loading, addEntregador, updateEntregador, deleteEntregador } = useEntregadoresData();
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [entregadorToEdit, setEntregadorToEdit] = useState<Entregador | null>(null);
+    const [selectedEntregador, setSelectedEntregador] = useState<Entregador | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('todos');
 
     const handleOpenForm = (entregador: Entregador | null) => {
         setEntregadorToEdit(entregador);
         setIsFormOpen(true);
+    };
+
+    const handleViewProfile = (entregador: Entregador) => {
+        setSelectedEntregador(entregador);
+        setIsProfileOpen(true);
     };
 
     const handleFormSubmit = (data: Omit<Entregador, 'id' | 'avatar'>) => {
@@ -76,7 +84,7 @@ export const EntregadoresPage: React.FC = () => {
 
     const renderEntregadorActions = (entregador: Entregador) => (
         <>
-            <Button variant="ghost" size="icon" onClick={() => toast.info('Visualização de perfil do entregador será implementada.')}>
+            <Button variant="ghost" size="icon" onClick={() => handleViewProfile(entregador)}>
                 <Eye className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" onClick={() => handleOpenForm(entregador)}>
@@ -204,6 +212,11 @@ export const EntregadoresPage: React.FC = () => {
                 onOpenChange={setIsFormOpen}
                 entregadorToEdit={entregadorToEdit}
                 onFormSubmit={handleFormSubmit}
+            />
+            <EntregadorProfileModal
+                open={isProfileOpen}
+                onOpenChange={setIsProfileOpen}
+                entregador={selectedEntregador}
             />
         </div>
     );

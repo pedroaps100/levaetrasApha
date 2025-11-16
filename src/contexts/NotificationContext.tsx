@@ -21,9 +21,11 @@ interface NotificationProviderProps {
 }
 
 const NOTIFICATION_STORAGE_KEY = 'app_seen_notifications_count';
+const audio = new Audio('/notification.mp3'); // Create a single audio instance
 
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
   const { solicitacoes } = useSolicitacoesData();
+  const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
   
   // State to track the total number of pending solicitations when the user last checked
   const [lastSeenPendingCount, setLastSeenPendingCount] = useState<number>(() => {
@@ -38,20 +40,45 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     return solicitacoes.filter(s => s.status === 'pendente').length;
   }, [solicitacoes]);
 
+  // Effect to unlock audio on first user interaction
+  useEffect(() => {
+    const unlockAudio = () => {
+      // This is a common pattern to unlock audio playback in browsers.
+      // We attempt to play and immediately pause. This "unlocks" the audio context.
+      audio.play().catch(() => {});
+      audio.pause();
+      audio.currentTime = 0;
+      
+      setIsAudioUnlocked(true);
+      // Clean up listeners once audio is unlocked.
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+    };
+
+    if (!isAudioUnlocked) {
+      window.addEventListener('click', unlockAudio);
+      window.addEventListener('keydown', unlockAudio);
+    }
+
+    return () => {
+        window.removeEventListener('click', unlockAudio);
+        window.removeEventListener('keydown', unlockAudio);
+    };
+  }, [isAudioUnlocked]);
+
   // Effect to play sound only when the number of pending solicitations increases
   useEffect(() => {
-    if (totalPending > previousTotalPending) {
-      const audio = new Audio('/notification.mp3');
+    if (isAudioUnlocked && totalPending > previousTotalPending) {
       audio.play().catch(error => console.error("Error playing notification sound:", error));
     }
     // Update the previous total for the next comparison
     setPreviousTotalPending(totalPending);
-  }, [totalPending, previousTotalPending]);
+  }, [totalPending, previousTotalPending, isAudioUnlocked]);
 
   // Initialize the previous count on mount to avoid sound on first load
   useEffect(() => {
     setPreviousTotalPending(totalPending);
-  }, []);
+  }, [totalPending]);
 
 
   // Function to clear notifications by updating the "seen" count

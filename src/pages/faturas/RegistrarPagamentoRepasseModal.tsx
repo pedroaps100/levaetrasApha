@@ -31,7 +31,7 @@ interface RegistrarPagamentoRepasseModalProps {
   isOpen: boolean;
   onClose: () => void;
   fatura: Fatura | null;
-  onSuccess: () => void;
+  onSuccess: (detalhes: string) => void;
 }
 
 export const RegistrarPagamentoRepasseModal: React.FC<RegistrarPagamentoRepasseModalProps> = ({ isOpen, onClose, fatura, onSuccess }) => {
@@ -62,15 +62,16 @@ export const RegistrarPagamentoRepasseModal: React.FC<RegistrarPagamentoRepasseM
 
   const watchedValues = form.watch();
 
+  const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
   const onSubmit = (data: FormValues) => {
-    console.log('Repasse data:', data);
+    const metodo = enabledPaymentMethods.find(pm => pm.id === data.metodoPagamentoId)?.name || 'N/A';
+    const detalhes = `Repasse de ${formatCurrency(data.valorPago)} via ${metodo} em ${format(data.dataPagamento, 'dd/MM/yyyy')}.`;
     toast.success(`Repasse da fatura ${fatura?.numero} registrado com sucesso!`);
-    onSuccess();
+    onSuccess(detalhes);
   };
 
   if (!fatura) return null;
-
-  const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

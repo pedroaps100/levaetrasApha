@@ -31,9 +31,10 @@ interface DespesaFormDialogProps {
   onOpenChange: (open: boolean) => void;
   despesaToEdit: Despesa | null;
   onFormSubmit: (data: Omit<Despesa, 'id'>) => void;
+  viewOnly?: boolean;
 }
 
-export const DespesaFormDialog: React.FC<DespesaFormDialogProps> = ({ open, onOpenChange, despesaToEdit, onFormSubmit }) => {
+export const DespesaFormDialog: React.FC<DespesaFormDialogProps> = ({ open, onOpenChange, despesaToEdit, onFormSubmit, viewOnly = false }) => {
   const { categories } = useSettingsData();
 
   const form = useForm<FormValues>({
@@ -56,8 +57,8 @@ export const DespesaFormDialog: React.FC<DespesaFormDialogProps> = ({ open, onOp
     }
   }, [despesaToEdit, open, form]);
 
-  const dialogTitle = despesaToEdit ? 'Editar Despesa' : 'Nova Despesa';
-  const dialogDescription = despesaToEdit ? 'Altere os dados da despesa abaixo.' : 'Preencha as informações para adicionar uma nova despesa.';
+  const dialogTitle = viewOnly ? 'Visualizar Despesa' : (despesaToEdit ? 'Editar Despesa' : 'Nova Despesa');
+  const dialogDescription = viewOnly ? 'Detalhes da despesa selecionada.' : (despesaToEdit ? 'Altere os dados da despesa abaixo.' : 'Preencha as informações para adicionar uma nova despesa.');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -69,20 +70,26 @@ export const DespesaFormDialog: React.FC<DespesaFormDialogProps> = ({ open, onOp
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onFormSubmit)}>
             <div className="grid max-h-[70vh] gap-4 overflow-y-auto p-1 pr-4">
-              <FormField control={form.control} name="descricao" render={({ field }) => (<FormItem><FormLabel>Descrição</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="descricao" render={({ field }) => (<FormItem><FormLabel>Descrição</FormLabel><FormControl><Input {...field} disabled={viewOnly} /></FormControl><FormMessage /></FormItem>)} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField control={form.control} name="valor" render={({ field }) => (<FormItem><FormLabel>Valor (R$)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="vencimento" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>Data de Vencimento</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{field.value ? format(field.value, "dd/MM/yyyy") : <span>Selecione a data</span>}</Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="valor" render={({ field }) => (<FormItem><FormLabel>Valor (R$)</FormLabel><FormControl><Input type="number" step="0.01" {...field} disabled={viewOnly} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="vencimento" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>Data de Vencimento</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={viewOnly}><CalendarIcon className="mr-2 h-4 w-4" />{field.value ? format(field.value, "dd/MM/yyyy") : <span>Selecione a data</span>}</Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
               </div>
-              <FormField control={form.control} name="fornecedor" render={({ field }) => (<FormItem><FormLabel>Fornecedor</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="fornecedor" render={({ field }) => (<FormItem><FormLabel>Fornecedor</FormLabel><FormControl><Input {...field} disabled={viewOnly} /></FormControl><FormMessage /></FormItem>)} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField control={form.control} name="categoria" render={({ field }) => (<FormItem><FormLabel>Categoria</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl><SelectContent>{categories.despesas.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="status" render={({ field }) => (<FormItem><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="Pendente">Pendente</SelectItem><SelectItem value="Atrasado">Atrasado</SelectItem><SelectItem value="Pago">Pago</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="categoria" render={({ field }) => (<FormItem><FormLabel>Categoria</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={viewOnly}><FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl><SelectContent>{categories.despesas.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="status" render={({ field }) => (<FormItem><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={viewOnly}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="Pendente">Pendente</SelectItem><SelectItem value="Atrasado">Atrasado</SelectItem><SelectItem value="Pago">Pago</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
               </div>
             </div>
             <DialogFooter className="pt-6">
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
-              <Button type="submit">{despesaToEdit ? 'Salvar Alterações' : 'Adicionar Despesa'}</Button>
+              {viewOnly ? (
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
+              ) : (
+                <>
+                  <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                  <Button type="submit">{despesaToEdit ? 'Salvar Alterações' : 'Adicionar Despesa'}</Button>
+                </>
+              )}
             </DialogFooter>
           </form>
         </Form>

@@ -10,8 +10,4 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  optimizeDeps: {
-    // A linha abaixo estava causando o erro e foi removida.
-    // exclude: ['lucide-react'], 
-  },
 });

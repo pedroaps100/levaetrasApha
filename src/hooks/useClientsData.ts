@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Cliente } from '@/types';
 import { faker } from '@faker-js/faker';
+import { initialClients } from '@/lib/mockData';
 
 // --- LocalStorage Helper ---
 function loadFromStorage<T>(key: string, defaultValue: T): T {
@@ -21,48 +22,8 @@ function saveToStorage<T>(key: string, value: T) {
     }
 }
 
-const generateMockClients = (): Cliente[] => {
-    return [
-        {
-            id: 'client-1',
-            nome: 'Padaria Pão Quente',
-            tipo: 'pessoa_juridica',
-            email: 'padaria@email.com',
-            telefone: '(21) 98877-6655',
-            endereco: 'Av. Atlântica, 1702',
-            bairro: 'Copacabana',
-            cidade: 'Rio de Janeiro',
-            uf: 'RJ',
-            chavePix: faker.finance.bitcoinAddress(),
-            status: 'ativo',
-            totalPedidos: 58,
-            valorTotal: 1250.70,
-            modalidade: 'faturado',
-            ativarFaturamentoAutomatico: true,
-            frequenciaFaturamento: 'semanal',
-            diaDaSemanaFaturamento: 'sexta',
-        },
-        {
-            id: 'client-2',
-            nome: 'Restaurante Sabor Divino',
-            tipo: 'pessoa_juridica',
-            email: 'restaurante@email.com',
-            telefone: '(21) 97766-5544',
-            endereco: 'R. Conde de Bonfim, 444',
-            bairro: 'Tijuca',
-            cidade: 'Rio de Janeiro',
-            uf: 'RJ',
-            chavePix: faker.finance.bitcoinAddress(),
-            status: 'ativo',
-            totalPedidos: 120,
-            valorTotal: 3420.00,
-            modalidade: 'pré-pago',
-        }
-    ];
-};
-
 export const useClientsData = () => {
-    const [clients, setClients] = useState<Cliente[]>(() => loadFromStorage('app_clients', generateMockClients()));
+    const [clients, setClients] = useState<Cliente[]>(() => loadFromStorage('app_clients', initialClients));
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
