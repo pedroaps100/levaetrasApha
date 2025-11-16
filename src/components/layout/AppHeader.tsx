@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, CalendarDays, Sun, Moon } from 'lucide-react';
+import { Bell, CalendarDays, Sun, Moon, UserCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,9 +17,23 @@ import { NavLink } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeProvider';
 
 export function AppHeader() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { setTheme } = useTheme();
   const today = format(new Date(2025, 7, 19), "dd 'de' MMMM, yyyy", { locale: ptBR });
+
+  const getProfileUrl = () => {
+    if (!user) return '#';
+    switch (user.role) {
+      case 'admin':
+        return '/configuracoes';
+      case 'cliente':
+        return '/cliente/perfil';
+      case 'entregador':
+        return '/entregador/perfil';
+      default:
+        return '#';
+    }
+  };
 
   return (
     <header className="flex h-16 items-center justify-end gap-4 border-b bg-card px-6">
@@ -68,11 +82,11 @@ export function AppHeader() {
             <DropdownMenuLabel>{user?.name}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <NavLink to="/configuracoes">Configurações</NavLink>
+              <NavLink to={getProfileUrl()} className="flex items-center">
+                <UserCircle className="mr-2 h-4 w-4" /> Meu Perfil
+              </NavLink>
             </DropdownMenuItem>
             <DropdownMenuItem>Suporte</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout}>Sair</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

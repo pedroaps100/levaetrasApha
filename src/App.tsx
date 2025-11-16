@@ -3,8 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { SidebarProvider } from '@/contexts/SidebarContext';
 import { Dashboard } from '@/components/dashboard/Dashboard';
-import { AppSidebar } from '@/components/layout/AppSidebar';
-import { AppHeader } from '@/components/layout/AppHeader';
 import { SettingsPage } from '@/components/settings/SettingsPage';
 import { ClientsPage } from '@/pages/clientes/ClientsPage';
 import { SolicitacoesPage } from '@/pages/solicitacoes/SolicitacoesPage';
@@ -15,35 +13,22 @@ import { FaturasFinalizadasPage } from '@/pages/faturas/FaturasFinalizadasPage';
 import { FinanceiroPage } from '@/pages/financeiro/FinanceiroPage';
 import { RelatoriosPage } from '@/pages/relatorios/RelatoriosPage';
 import { Toaster } from '@/components/ui/sonner';
-import { cn } from './lib/utils';
 import { ThemeProvider } from './contexts/ThemeProvider';
 import { NotificationProvider } from './contexts/NotificationContext';
-import { useSidebar } from '@/hooks/useSidebar';
 import { LoginPage } from './pages/auth/LoginPage';
 import { Skeleton } from './components/ui/skeleton';
-import { ClientLayout } from './pages/client/ClientLayout';
 import { ClientDashboardPage } from './pages/client/ClientDashboardPage';
-import { DriverLayout } from './pages/driver/DriverLayout';
 import { DriverDashboardPage } from './pages/driver/DriverDashboardPage';
 import { TransactionProvider } from './contexts/TransactionContext';
+import { AuthenticatedLayout } from './components/layout/AuthenticatedLayout';
 
-const AdminLayout: React.FC = () => {
-  const { isCollapsed } = useSidebar();
-  return (
-    <div className="flex min-h-screen w-full">
-      <AppSidebar />
-      <div className={cn(
-        "flex flex-1 flex-col transition-all duration-300 ease-in-out",
-        isCollapsed ? "md:ml-20" : "md:ml-64"
-      )}>
-        <AppHeader />
-        <main className="flex-1 bg-muted/40 p-4 sm:p-6 md:p-8">
-          <Outlet />
-        </main>
-      </div>
-    </div>
-  );
-};
+// Placeholders for new routes
+import ClientSolicitacoesPage from './pages/client/ClientSolicitacoesPage';
+import ClientFinanceiroPage from './pages/client/ClientFinanceiroPage';
+import ClientPerfilPage from './pages/client/ClientPerfilPage';
+import DriverHistoricoPage from './pages/driver/DriverHistoricoPage';
+import DriverFinanceiroPage from './pages/driver/DriverFinanceiroPage';
+import DriverPerfilPage from './pages/driver/DriverPerfilPage';
 
 const ProtectedRoute: React.FC<{ allowedRoles: string[] }> = ({ allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -62,12 +47,7 @@ const ProtectedRoute: React.FC<{ allowedRoles: string[] }> = ({ allowedRoles }) 
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (!allowedRoles.includes(user.role)) {
-    // Redirect to a 'not-authorized' page or back to login
+  if (!user || !allowedRoles.includes(user.role)) {
     return <Navigate to="/login" replace />;
   }
 
@@ -85,9 +65,10 @@ function App() {
                 <Routes>
                   <Route path="/login" element={<LoginPage />} />
 
-                  {/* Admin Routes */}
-                  <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-                    <Route element={<AdminLayout />}>
+                  {/* Parent route for the main authenticated layout */}
+                  <Route element={<AuthenticatedLayout />}>
+                    {/* Admin Routes */}
+                    <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
                       <Route path="/" element={<Dashboard />} />
                       <Route path="/solicitacoes" element={<SolicitacoesPage />} />
                       <Route path="/clientes" element={<ClientsPage />} />
@@ -99,20 +80,22 @@ function App() {
                       <Route path="/relatorios" element={<RelatoriosPage />} />
                       <Route path="/configuracoes" element={<SettingsPage />} />
                     </Route>
-                  </Route>
 
-                  {/* Client Routes */}
-                  <Route element={<ProtectedRoute allowedRoles={['cliente']} />}>
-                      <Route path="/cliente" element={<ClientLayout />}>
-                          <Route index element={<ClientDashboardPage />} />
-                      </Route>
-                  </Route>
+                    {/* Client Routes */}
+                    <Route path="/cliente" element={<ProtectedRoute allowedRoles={['cliente']} />}>
+                        <Route index element={<ClientDashboardPage />} />
+                        <Route path="solicitacoes" element={<ClientSolicitacoesPage />} />
+                        <Route path="financeiro" element={<ClientFinanceiroPage />} />
+                        <Route path="perfil" element={<ClientPerfilPage />} />
+                    </Route>
 
-                  {/* Driver Routes */}
-                  <Route element={<ProtectedRoute allowedRoles={['entregador']} />}>
-                      <Route path="/entregador" element={<DriverLayout />}>
-                          <Route index element={<DriverDashboardPage />} />
-                      </Route>
+                    {/* Driver Routes */}
+                    <Route path="/entregador" element={<ProtectedRoute allowedRoles={['entregador']} />}>
+                        <Route index element={<DriverDashboardPage />} />
+                        <Route path="historico" element={<DriverHistoricoPage />} />
+                        <Route path="financeiro" element={<DriverFinanceiroPage />} />
+                        <Route path="perfil" element={<DriverPerfilPage />} />
+                    </Route>
                   </Route>
 
                   <Route path="*" element={<Navigate to="/login" replace />} />

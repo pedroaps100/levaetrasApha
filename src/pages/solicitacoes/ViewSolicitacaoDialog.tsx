@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, History } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { HistoricoSolicitacaoTab } from './HistoricoSolicitacaoTab';
+import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 
 interface ViewSolicitacaoDialogProps {
     isOpen: boolean;
@@ -112,6 +114,8 @@ const DetalhesTab: React.FC<{ solicitacao: Solicitacao }> = ({ solicitacao }) =>
 }
 
 export const ViewSolicitacaoDialog: React.FC<ViewSolicitacaoDialogProps> = ({ isOpen, onClose, solicitacao }) => {
+    const { user } = useAuth();
+    
     if (!solicitacao) return null;
 
     return (
@@ -125,18 +129,22 @@ export const ViewSolicitacaoDialog: React.FC<ViewSolicitacaoDialogProps> = ({ is
                 </DialogHeader>
                 <div className="max-h-[70vh] overflow-y-auto p-1 pr-4">
                     <Tabs defaultValue="detalhes">
-                        <TabsList className="grid w-full grid-cols-2">
+                        <TabsList className={cn("grid w-full", user?.role === 'admin' ? "grid-cols-2" : "grid-cols-1")}>
                             <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
-                            <TabsTrigger value="historico" className="flex items-center gap-2">
-                                <History className="h-4 w-4" /> Histórico
-                            </TabsTrigger>
+                            {user?.role === 'admin' && (
+                                <TabsTrigger value="historico" className="flex items-center gap-2">
+                                    <History className="h-4 w-4" /> Histórico
+                                </TabsTrigger>
+                            )}
                         </TabsList>
                         <TabsContent value="detalhes" className="mt-4">
                             <DetalhesTab solicitacao={solicitacao} />
                         </TabsContent>
-                        <TabsContent value="historico" className="mt-4">
-                            <HistoricoSolicitacaoTab historico={solicitacao.historico || []} />
-                        </TabsContent>
+                        {user?.role === 'admin' && (
+                            <TabsContent value="historico" className="mt-4">
+                                <HistoricoSolicitacaoTab historico={solicitacao.historico || []} />
+                            </TabsContent>
+                        )}
                     </Tabs>
                 </div>
                 <DialogFooter className="pt-4">

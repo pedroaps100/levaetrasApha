@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -26,6 +26,7 @@ const rotaSchema = z.object({
     valorAReceber: z.coerce.number().optional(),
     meiosPagamentoAceitos: z.array(z.string()).optional(),
     taxaEntrega: z.number().default(0),
+    taxasExtrasIds: z.array(z.string()).optional(),
 });
 
 const formSchema = z.object({
@@ -43,20 +44,22 @@ interface SolicitacaoFormDialogProps {
 
 export const SolicitacaoFormDialog: React.FC<SolicitacaoFormDialogProps> = ({ isOpen, onClose, onFormSubmit }) => {
     const { clientData } = useAuth();
-    const { regions, bairros, enabledPaymentMethods, loading: settingsLoading } = useSettingsData();
+    const { regions, bairros, enabledPaymentMethods, taxasExtras, loading: settingsLoading } = useSettingsData();
     const [confirmationData, setConfirmationData] = useState<SolicitacaoFormData | null>(null);
 
     const form = useForm<SolicitacaoFormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-            rotas: [{ bairroDestinoId: '', responsavel: '', telefone: '', observacoes: '', receberDoCliente: false, taxaEntrega: 0 }],
+            rotas: [{ bairroDestinoId: '', responsavel: '', telefone: '', observacoes: '', receberDoCliente: false, taxaEntrega: 0, taxasExtrasIds: [] }],
         },
     });
 
     useEffect(() => {
-        form.reset({
-            rotas: [{ bairroDestinoId: '', responsavel: '', telefone: '', observacoes: '', receberDoCliente: false, taxaEntrega: 0 }],
-        });
+        if (isOpen) {
+            form.reset({
+                rotas: [{ bairroDestinoId: '', responsavel: '', telefone: '', observacoes: '', receberDoCliente: false, taxaEntrega: 0, taxasExtrasIds: [] }],
+            });
+        }
     }, [isOpen, form]);
 
     const { fields, append, remove } = useFieldArray({
@@ -66,20 +69,24 @@ export const SolicitacaoFormDialog: React.FC<SolicitacaoFormDialogProps> = ({ is
 
     const watchedRotas = form.watch('rotas');
 
-    const summary = useMemo(() => {
-        const valorTotalTaxas = watchedRotas.reduce((sum, rota) => sum + (rota.taxaEntrega || 0), 0);
-        const valorTotalRepasse = watchedRotas.reduce((sum, rota) => sum + (Number(rota.valorAReceber) || 0), 0);
-        return { valorTotalTaxas, valorTotalRepasse };
-    }, [watchedRotas]);
+    // Direct calculation on each render, triggered by form.watch()
+    const valorTotalTaxas = watchedRotas.reduce((sum, rota) => sum + (rota.taxaEntrega || 0), 0);
+    const valorTotalTaxasExtras = watchedRotas.reduce((sum, rota) => {
+        const taxasSelecionadas = taxasExtras.filter(te => rota.taxasExtrasIds?.includes(te.id));
+        const valorDasTaxas = taxasSelecionadas.reduce((subSum, te) => subSum + te.valor, 0);
+        return sum + valorDasTaxas;
+    }, 0);
+    const valorTotalRepasse = watchedRotas.reduce((sum, rota) => sum + (Number(rota.valorAReceber) || 0), 0);
 
     const handleReview = (data: SolicitacaoFormValues) => {
         if (!clientData) return;
 
         if (clientData.modalidade === 'pré-pago') {
             const saldoAtual = 532.50; // Mocked balance
-            if (saldoAtual < summary.valorTotalTaxas) {
+            const custoTotal = valorTotalTaxas + valorTotalTaxasExtras;
+            if (saldoAtual < custoTotal) {
                 toast.error("Saldo insuficiente para realizar esta solicitação.", {
-                    description: `Seu saldo é de ${saldoAtual.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} e o custo da entrega é de ${summary.valorTotalTaxas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.`,
+                    description: `Seu saldo é de ${saldoAtual.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} e o custo da entrega é de ${custoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.`,
                 });
                 return;
             }
@@ -95,8 +102,9 @@ export const SolicitacaoFormDialog: React.FC<SolicitacaoFormDialogProps> = ({ is
             operationDescription: 'Coleta na loja X Entregar ao Cliente',
             pontoColeta: `${clientData.endereco}, ${clientData.bairro}`,
             rotas: rotasCompletas,
-            valorTotalTaxas: summary.valorTotalTaxas,
-            valorTotalRepasse: summary.valorTotalRepasse,
+            valorTotalTaxas,
+            valorTotalTaxasExtras,
+            valorTotalRepasse,
         });
     };
 
@@ -153,6 +161,11 @@ export const SolicitacaoFormDialog: React.FC<SolicitacaoFormDialogProps> = ({ is
                                                         <FormField control={form.control} name={`rotas.${index}.telefone`} render={({ field }) => (<FormItem><FormLabel>Telefone</FormLabel><FormControl><Input placeholder="(11) 99999-9999" {...field} /></FormControl><FormMessage /></FormItem>)} />
                                                     </div>
                                                     <FormField control={form.control} name={`rotas.${index}.observacoes`} render={({ field }) => (<FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea placeholder="Ex: Deixar na portaria, produto frágil..." {...field} /></FormControl><FormMessage /></FormItem>)} />
+                                                    
+                                                    <div className="p-4 bg-muted/50 rounded-lg space-y-4">
+                                                        <FormField control={form.control} name={`rotas.${index}.taxasExtrasIds`} render={() => ( <FormItem> <div className="mb-2"><FormLabel>Taxas Extras (Opcional)</FormLabel></div> <div className="flex flex-wrap gap-x-4 gap-y-2"> {taxasExtras.map((item) => ( <FormField key={item.id} control={form.control} name={`rotas.${index}.taxasExtrasIds`} render={({ field }) => ( <FormItem key={item.id} className="flex flex-row items-center space-x-2 space-y-0"> <FormControl><Checkbox checked={field.value?.includes(item.id)} onCheckedChange={(checked) => { return checked ? field.onChange([...(field.value || []), item.id]) : field.onChange(field.value?.filter((value) => value !== item.id)) }} /></FormControl> <FormLabel className="font-normal">{item.nome} (+{item.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})</FormLabel> </FormItem> )} /> ))} </div> <FormMessage /> </FormItem> )} />
+                                                    </div>
+
                                                     <FormField control={form.control} name={`rotas.${index}.receberDoCliente`} render={({ field }) => (
                                                         <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md py-2"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Receber do cliente final?</FormLabel></div></FormItem>
                                                     )} />
@@ -184,14 +197,16 @@ export const SolicitacaoFormDialog: React.FC<SolicitacaoFormDialogProps> = ({ is
                                             )
                                         })}
                                     </div>
-                                    <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => append({ bairroDestinoId: '', responsavel: '', telefone: '', observacoes: '', receberDoCliente: false, taxaEntrega: 0 })}>
+                                    <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => append({ bairroDestinoId: '', responsavel: '', telefone: '', observacoes: '', receberDoCliente: false, taxaEntrega: 0, taxasExtrasIds: [] })}>
                                         <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Rota
                                     </Button>
                                 </div>
 
                                 <div className="mt-6 p-4 border-t space-y-2">
-                                    <div className="flex justify-between font-medium"><span>Valor Total da Entrega (Taxas):</span><span>{summary.valorTotalTaxas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
-                                    {summary.valorTotalRepasse > 0 && <div className="flex justify-between font-medium"><span>Valor Total dos Produtos (Repasse):</span><span>{summary.valorTotalRepasse.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>}
+                                    <div className="flex justify-between font-medium"><span>Subtotal Taxas de Entrega:</span><span>{valorTotalTaxas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+                                    {valorTotalTaxasExtras > 0 && <div className="flex justify-between font-medium"><span>Subtotal Taxas Extras:</span><span>{valorTotalTaxasExtras.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>}
+                                    {valorTotalRepasse > 0 && <div className="flex justify-between font-medium"><span>Valor Total dos Produtos (Repasse):</span><span>{valorTotalRepasse.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>}
+                                    <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2"><span>Total a Pagar:</span><span>{(valorTotalTaxas + valorTotalTaxasExtras).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
                                 </div>
                             </div>
                             <DialogFooter className="pt-6">

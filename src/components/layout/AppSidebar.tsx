@@ -1,21 +1,14 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
-  Clock, 
-  Users, 
-  Truck, 
-  FileText, 
-  CreditCard, 
-  DollarSign, 
-  BarChart3,
-  Settings,
-  LogOut,
   Menu,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  CheckCircle,
+  Truck,
+  LogOut,
+  Settings,
+  UserCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,6 +19,8 @@ import { useSidebar } from '@/hooks/useSidebar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useNotification } from '@/contexts/NotificationContext';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { navigationConfig, NavItemConfig } from '@/lib/navigation';
+import { Separator } from '../ui/separator';
 
 const NavItem: React.FC<{ item: { title: string; url: string; icon: React.ElementType; badge?: number; }, isCollapsed: boolean }> = ({ item, isCollapsed }) => {
   const location = useLocation();
@@ -65,28 +60,17 @@ const NavItem: React.FC<{ item: { title: string; url: string; icon: React.Elemen
   );
 };
 
-const NavCollapsibleItem: React.FC<{ title: string; icon: React.ElementType; isCollapsed: boolean; children: React.ReactNode; baseUrl: string; }> = ({ title, icon: Icon, isCollapsed, children, baseUrl }) => {
+const NavCollapsibleItem: React.FC<{ item: NavItemConfig; isCollapsed: boolean; children: React.ReactNode; }> = ({ item, isCollapsed, children }) => {
     const location = useLocation();
-    const isActive = location.pathname.startsWith(baseUrl);
+    const isActive = item.children?.some(child => location.pathname.startsWith(child.url)) ?? false;
     const [isOpen, setIsOpen] = useState(isActive);
 
     React.useEffect(() => {
-        if (isActive) {
-            setIsOpen(true);
-        }
-    }, [isActive]);
+        setIsOpen(isActive);
+    }, [isActive, location.pathname]);
 
     if (isCollapsed) {
-        return (
-            <>
-                {React.Children.map(children, (child) => {
-                    if (React.isValidElement(child)) {
-                        return React.cloneElement(child as React.ReactElement<any>, { isCollapsed });
-                    }
-                    return child;
-                })}
-            </>
-        )
+        return <>{children}</>;
     }
 
     return (
@@ -96,8 +80,8 @@ const NavCollapsibleItem: React.FC<{ title: string; icon: React.ElementType; isC
                     'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
                     isActive && 'text-primary'
                 )}>
-                    <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
-                    <span className="flex-1 text-left">{title}</span>
+                    <item.icon className={cn("h-5 w-5", isActive && "text-primary")} />
+                    <span className="flex-1 text-left">{item.title}</span>
                     <ChevronDown className={cn("h-4 w-4 transition-transform", isOpen && "rotate-180")} />
                 </button>
             </CollapsibleTrigger>
@@ -109,59 +93,76 @@ const NavCollapsibleItem: React.FC<{ title: string; icon: React.ElementType; isC
 };
 
 const NavContent: React.FC<{ isCollapsed: boolean }> = ({ isCollapsed }) => {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const { solicitacoesCount } = useNotification();
+  
+  const menuItems = user ? navigationConfig[user.role] : [];
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const getBadgeCount = (badgeKey?: string) => {
+    if (badgeKey === 'solicitacoes' && user?.role === 'admin') {
+      return solicitacoesCount;
+    }
+    return 0;
   };
 
-  const menuItems = [
-    { title: 'Dashboard', url: '/', icon: LayoutDashboard },
-    { title: 'Solicitações', url: '/solicitacoes', icon: Clock, badge: solicitacoesCount },
-    { title: 'Clientes', url: '/clientes', icon: Users },
-    { title: 'Entregadores', url: '/entregadores', icon: Truck },
-    { title: 'Entregas', url: '/entregas', icon: FileText },
-    { title: 'Financeiro', url: '/financeiro', icon: DollarSign },
-    { title: 'Relatórios', url: '/relatorios', icon: BarChart3 },
-  ];
-  
+  const homeUrl = user ? (user.role === 'admin' ? '/' : `/${user.role}`) : '/';
+
+  const getProfileUrl = () => {
+    if (!user) return '#';
+    switch (user.role) {
+      case 'admin': return '/configuracoes';
+      case 'cliente': return '/cliente/perfil';
+      case 'entregador': return '/entregador/perfil';
+      default: return '#';
+    }
+  };
+  const getProfileTitle = () => user?.role === 'admin' ? 'Configurações' : 'Meu Perfil';
+
   return (
     <div className="flex h-full flex-col">
       <div className={cn("flex h-16 items-center border-b px-6", isCollapsed && "px-2 justify-center")}>
-        <NavLink to="/" className="flex items-center gap-2 font-semibold text-primary">
+        <NavLink to={homeUrl} className="flex items-center gap-2 font-semibold text-primary">
           <Truck className="h-7 w-7" />
-          {!isCollapsed && <span className="text-lg">Delivery Admin</span>}
+          {!isCollapsed && <span className="text-lg">Delivery App</span>}
         </NavLink>
       </div>
       <div className="flex-1 overflow-y-auto py-4">
         <nav className={cn("grid items-start gap-1 px-4 text-sm font-medium", isCollapsed && "px-2")}>
           {menuItems.map((item) => (
-            <NavItem key={item.title} item={item} isCollapsed={isCollapsed} />
+            item.children ? (
+              <NavCollapsibleItem key={item.title} item={item} isCollapsed={isCollapsed}>
+                {item.children.map(child => (
+                   <NavItem key={child.title} item={{...child, badge: getBadgeCount(child.badge)}} isCollapsed={isCollapsed} />
+                ))}
+              </NavCollapsibleItem>
+            ) : (
+              <NavItem key={item.title} item={{...item, badge: getBadgeCount(item.badge)}} isCollapsed={isCollapsed} />
+            )
           ))}
-          <NavCollapsibleItem title="Faturas" icon={CreditCard} isCollapsed={isCollapsed} baseUrl="/faturas">
-             <NavItem item={{ title: 'Gerenciamento', url: '/faturas', icon: CreditCard }} isCollapsed={isCollapsed} />
-             <NavItem item={{ title: 'Finalizadas', url: '/faturas/finalizadas', icon: CheckCircle }} isCollapsed={isCollapsed} />
-          </NavCollapsibleItem>
         </nav>
       </div>
-      <div className="mt-auto p-4 border-t">
-        <nav className={cn("grid gap-1 px-2 text-sm font-medium", isCollapsed && "px-0")}>
-          <NavItem item={{ title: 'Configurações', url: '/configuracoes', icon: Settings }} isCollapsed={isCollapsed} />
+      <div className={cn("mt-auto border-t p-4", isCollapsed && "p-2")}>
+        <nav className="grid gap-1">
+          <NavItem
+            isCollapsed={isCollapsed}
+            item={{
+              title: getProfileTitle(),
+              url: getProfileUrl(),
+              icon: user?.role === 'admin' ? Settings : UserCircle,
+            }}
+          />
           <TooltipProvider delayDuration={0}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={handleLogout}
+                  onClick={logout}
                   className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-muted-foreground transition-all hover:text-primary',
+                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
                     isCollapsed && 'justify-center'
                   )}
                 >
                   <LogOut className="h-5 w-5" />
-                  {!isCollapsed && 'Sair'}
+                  {!isCollapsed && <span className="flex-1 text-left">Sair</span>}
                 </button>
               </TooltipTrigger>
               {isCollapsed && (
@@ -182,7 +183,6 @@ export function AppSidebar() {
 
   return (
     <>
-      {/* Mobile Sidebar */}
       <div className="md:hidden">
         <Sheet>
           <SheetTrigger asChild>
@@ -201,7 +201,6 @@ export function AppSidebar() {
         </Sheet>
       </div>
 
-      {/* Desktop Sidebar */}
       <aside className={cn(
         "hidden md:fixed md:inset-y-0 md:left-0 md:z-10 md:flex flex-col bg-card border-r transition-all duration-300 ease-in-out",
         isCollapsed ? "w-20" : "w-64"
