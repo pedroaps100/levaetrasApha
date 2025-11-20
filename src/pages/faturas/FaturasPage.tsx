@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { toast } from "sonner";
-import { Plus, Search, Trash2, Eye, FileText, Clock, TrendingUp, TrendingDown, MoreHorizontal, Download, Filter } from 'lucide-react';
+import { Plus, Search, Trash2, Eye, FileText, Clock, TrendingUp, TrendingDown, MoreHorizontal, Download, Filter, RefreshCw } from 'lucide-react';
 import { Fatura, FaturaStatusGeral, FaturaStatusPagamento, FaturaStatusRepasse } from '@/types';
 import { useFaturasData } from '@/hooks/useFaturasData';
 import { format } from 'date-fns';
@@ -143,6 +143,7 @@ export const FaturasPage: React.FC = () => {
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input placeholder="Buscar por número, cliente ou status..." className="pl-8 w-full" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                         </div>
+                        <Button variant="outline" className="w-full md:w-auto gap-2" onClick={() => window.location.reload()}><RefreshCw className="h-4 w-4" />Recarregar</Button>
                         <Button variant="outline" className="w-full md:w-auto gap-2"><Filter className="h-4 w-4" />Filtros</Button>
                         <Button variant="outline" className="w-full md:w-auto gap-2"><Download className="h-4 w-4" />Exportar PDF</Button>
                         <Button className="w-full md:w-auto gap-2"><Plus className="h-4 w-4" />Ações</Button>

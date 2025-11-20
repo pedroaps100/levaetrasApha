@@ -20,6 +20,7 @@ import { Skeleton } from './components/ui/skeleton';
 import { ClientDashboardPage } from './pages/client/ClientDashboardPage';
 import { DriverDashboardPage } from './pages/driver/DriverDashboardPage';
 import { TransactionProvider } from './contexts/TransactionContext';
+import { FaturasProvider } from './contexts/FaturasContext';
 import { AuthenticatedLayout } from './components/layout/AuthenticatedLayout';
 
 // Placeholders for new routes
@@ -57,55 +58,57 @@ const ProtectedRoute: React.FC<{ allowedRoles: string[] }> = ({ allowedRoles }) 
 function App() {
   return (
     <AuthProvider>
-      <TransactionProvider>
-        <NotificationProvider>
-          <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
-            <SidebarProvider>
-              <Router>
-                <Routes>
-                  <Route path="/login" element={<LoginPage />} />
+      <FaturasProvider>
+        <TransactionProvider>
+          <NotificationProvider>
+            <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
+              <SidebarProvider>
+                <Router>
+                  <Routes>
+                    <Route path="/login" element={<LoginPage />} />
 
-                  {/* Parent route for the main authenticated layout */}
-                  <Route element={<AuthenticatedLayout />}>
-                    {/* Admin Routes */}
-                    <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-                      <Route path="/" element={<Dashboard />} />
-                      <Route path="/solicitacoes" element={<SolicitacoesPage />} />
-                      <Route path="/clientes" element={<ClientsPage />} />
-                      <Route path="/entregadores" element={<EntregadoresPage />} />
-                      <Route path="/entregas" element={<EntregasPage />} />
-                      <Route path="/faturas" element={<FaturasPage />} />
-                      <Route path="/faturas/finalizadas" element={<FaturasFinalizadasPage />} />
-                      <Route path="/financeiro" element={<FinanceiroPage />} />
-                      <Route path="/relatorios" element={<RelatoriosPage />} />
-                      <Route path="/configuracoes" element={<SettingsPage />} />
+                    {/* Parent route for the main authenticated layout */}
+                    <Route element={<AuthenticatedLayout />}>
+                      {/* Admin Routes */}
+                      <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/solicitacoes" element={<SolicitacoesPage />} />
+                        <Route path="/clientes" element={<ClientsPage />} />
+                        <Route path="/entregadores" element={<EntregadoresPage />} />
+                        <Route path="/entregas" element={<EntregasPage />} />
+                        <Route path="/faturas" element={<FaturasPage />} />
+                        <Route path="/faturas/finalizadas" element={<FaturasFinalizadasPage />} />
+                        <Route path="/financeiro" element={<FinanceiroPage />} />
+                        <Route path="/relatorios" element={<RelatoriosPage />} />
+                        <Route path="/configuracoes" element={<SettingsPage />} />
+                      </Route>
+
+                      {/* Client Routes */}
+                      <Route path="/cliente" element={<ProtectedRoute allowedRoles={['cliente']} />}>
+                          <Route index element={<ClientDashboardPage />} />
+                          <Route path="solicitacoes" element={<ClientSolicitacoesPage />} />
+                          <Route path="financeiro" element={<ClientFinanceiroPage />} />
+                          <Route path="perfil" element={<ClientPerfilPage />} />
+                      </Route>
+
+                      {/* Driver Routes */}
+                      <Route path="/entregador" element={<ProtectedRoute allowedRoles={['entregador']} />}>
+                          <Route index element={<DriverDashboardPage />} />
+                          <Route path="historico" element={<DriverHistoricoPage />} />
+                          <Route path="financeiro" element={<DriverFinanceiroPage />} />
+                          <Route path="perfil" element={<DriverPerfilPage />} />
+                      </Route>
                     </Route>
 
-                    {/* Client Routes */}
-                    <Route path="/cliente" element={<ProtectedRoute allowedRoles={['cliente']} />}>
-                        <Route index element={<ClientDashboardPage />} />
-                        <Route path="solicitacoes" element={<ClientSolicitacoesPage />} />
-                        <Route path="financeiro" element={<ClientFinanceiroPage />} />
-                        <Route path="perfil" element={<ClientPerfilPage />} />
-                    </Route>
-
-                    {/* Driver Routes */}
-                    <Route path="/entregador" element={<ProtectedRoute allowedRoles={['entregador']} />}>
-                        <Route index element={<DriverDashboardPage />} />
-                        <Route path="historico" element={<DriverHistoricoPage />} />
-                        <Route path="financeiro" element={<DriverFinanceiroPage />} />
-                        <Route path="perfil" element={<DriverPerfilPage />} />
-                    </Route>
-                  </Route>
-
-                  <Route path="*" element={<Navigate to="/login" replace />} />
-                </Routes>
-                <Toaster />
-              </Router>
-            </SidebarProvider>
-          </ThemeProvider>
-        </NotificationProvider>
-      </TransactionProvider>
+                    <Route path="*" element={<Navigate to="/login" replace />} />
+                  </Routes>
+                  <Toaster />
+                </Router>
+              </SidebarProvider>
+            </ThemeProvider>
+          </NotificationProvider>
+        </TransactionProvider>
+      </FaturasProvider>
     </AuthProvider>
   );
 }

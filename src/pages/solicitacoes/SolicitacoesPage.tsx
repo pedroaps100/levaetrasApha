@@ -118,6 +118,12 @@ export const SolicitacoesPage: React.FC = () => {
     const handleConfirmConciliacao = (conciliacaoData: ConciliacaoData) => {
         if (solicitacaoToConciliate) {
             const cliente = clients.find(c => c.id === solicitacaoToConciliate.clienteId);
+            
+            if (!cliente) {
+                toast.error("Erro ao finalizar: Dados do cliente não encontrados.");
+                return;
+            }
+
             if (solicitacaoToConciliate.status === 'em_andamento') {
                 updateStatusSolicitacao(solicitacaoToConciliate.id, 'concluida', { cliente, conciliacao: conciliacaoData, formasPagamento: formasPagamentoConciliacao, taxasExtras });
                 toast.success(`Solicitação ${solicitacaoToConciliate.codigo} conciliada e finalizada!`);

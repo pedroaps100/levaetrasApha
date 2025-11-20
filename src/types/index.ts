@@ -102,9 +102,13 @@ export interface EntregaIncluida {
   descricao: string;
   entregadorId?: string;
   entregadorNome?: string;
-  taxaEntrega: number;
+  taxaEntrega: number; // Valor original da taxa
   taxasExtras: { nome: string; valor: number }[];
-  valorRepasse: number;
+  valorRepasse: number; // Valor original do repasse
+  
+  // Novos campos para controle financeiro preciso
+  taxaFaturada?: number; // Valor que realmente entrou como débito na fatura
+  repasseFaturado?: number; // Valor que realmente entrou como crédito na fatura
 }
 
 export type HistoricoAcao = 'criada' | 'fechada' | 'pagamento_taxa' | 'pagamento_repasse' | 'finalizada';
@@ -216,6 +220,7 @@ export interface Category {
 export interface Region {
   id: string;
   name: string;
+  // tax?: number; // Removido pois a taxa agora é por bairro
 }
 
 export interface Bairro {

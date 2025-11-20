@@ -4,6 +4,7 @@ import { faker } from '@faker-js/faker';
 import { useFaturasData } from './useFaturasData';
 import { useTransaction } from '@/contexts/TransactionContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 // --- LocalStorage Helper ---
 function loadFromStorage<T>(key: string, defaultValue: T): T {
@@ -95,7 +96,6 @@ export const useSolicitacoesData = () => {
             data = generateMockSolicitacoes(25).sort((a, b) => b.dataSolicitacao.getTime() - a.dataSolicitacao.getTime());
         }
         
-        // Data migration/validation to ensure every rota has a unique ID
         return data.map(s => ({
             ...s,
             rotas: Array.isArray(s.rotas) ? s.rotas.map(r => ({
@@ -168,6 +168,43 @@ export const useSolicitacoesData = () => {
     };
 
     const updateStatusSolicitacao = (id: string, newStatus: SolicitacaoStatus, details?: { justificativa?: string; entregador?: Entregador; cliente?: Cliente; conciliacao?: ConciliacaoData; formasPagamento?: FormaPagamentoConciliacao[]; taxasExtras?: TaxaExtra[] }) => {
+        const solicitacaoToUpdate = solicitacoes.find(s => s.id === id);
+        if (!solicitacaoToUpdate) return;
+
+        if (newStatus === 'concluida') {
+            if (!details?.cliente) {
+                console.error("ERRO CRÍTICO: Tentativa de concluir solicitação sem dados do cliente. Faturamento não será gerado.");
+                toast.error("Erro ao gerar fatura: Dados do cliente ausentes.");
+            } else {
+                if (details.cliente.modalidade === 'pré-pago') {
+                    addTransaction({
+                        type: 'debit',
+                        origin: 'delivery_fee',
+                        description: `Taxa da entrega ${solicitacaoToUpdate.codigo}`,
+                        value: solicitacaoToUpdate.valorTotalTaxas,
+                        clientName: solicitacaoToUpdate.clienteNome,
+                        clientAvatar: solicitacaoToUpdate.clienteAvatar,
+                    });
+                } else if (details.cliente.modalidade === 'faturado') {
+                    // Relaxed condition: removed strict check for taxasExtras to ensure fatura is created even if extras are missing
+                    const updatedForFatura = { 
+                        ...solicitacaoToUpdate, 
+                        status: newStatus,
+                        ...(details.conciliacao && { conciliacao: details.conciliacao })
+                    };
+                    
+                    // Call context function with safe defaults
+                    addEntregaToFatura(
+                        updatedForFatura, 
+                        details.taxasExtras || [], 
+                        details.conciliacao, 
+                        details.formasPagamento || [], 
+                        details.cliente
+                    );
+                }
+            }
+        }
+
         setSolicitacoes(prev => prev.map(s => {
             if (s.id === id) {
                 const updatedSolicitacao: Solicitacao = { ...s, status: newStatus };
@@ -203,22 +240,6 @@ export const useSolicitacoesData = () => {
                     updatedSolicitacao.entregadorAvatar = details.entregador.avatar;
                 }
                 if (details?.conciliacao) updatedSolicitacao.conciliacao = details.conciliacao;
-
-                // Financial Flow Logic
-                if (newStatus === 'concluida' && details?.cliente) {
-                    if (details.cliente.modalidade === 'pré-pago') {
-                        addTransaction({
-                            type: 'debit',
-                            origin: 'delivery_fee',
-                            description: `Taxa da entrega ${s.codigo}`,
-                            value: s.valorTotalTaxas,
-                            clientName: s.clienteNome,
-                            clientAvatar: s.clienteAvatar,
-                        });
-                    } else if (details.cliente.modalidade === 'faturado' && details.taxasExtras) {
-                        addEntregaToFatura(updatedSolicitacao, details.taxasExtras);
-                    }
-                }
 
                 return updatedSolicitacao;
             }
