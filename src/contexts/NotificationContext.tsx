@@ -1,9 +1,14 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSolicitacoesData } from '@/hooks/useSolicitacoesData';
+import { Solicitacao } from '@/types';
+import { useAuth } from './AuthContext';
+import { toast } from 'sonner';
 
 interface NotificationContextType {
   solicitacoesCount: number;
   clearSolicitacoesNotifications: () => void;
+  requestPermission: () => void;
+  permissionStatus: NotificationPermission;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -21,78 +26,139 @@ interface NotificationProviderProps {
 }
 
 const NOTIFICATION_STORAGE_KEY = 'app_seen_notifications_count';
-const audio = new Audio('/notification.mp3'); // Create a single audio instance
+const audio = new Audio('/notification.mp3');
+
+// Custom hook to get the previous value of a prop/state
+function usePrevious<T>(value: T): T | undefined {
+  const ref = useRef<T>();
+  useEffect(() => {
+    ref.current = value;
+  });
+  return ref.current;
+}
 
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
+  const { user } = useAuth();
   const { solicitacoes } = useSolicitacoesData();
   const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
-  
-  // State to track the total number of pending solicitations when the user last checked
+  const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>('default');
+
   const [lastSeenPendingCount, setLastSeenPendingCount] = useState<number>(() => {
     return parseInt(localStorage.getItem(NOTIFICATION_STORAGE_KEY) || '0', 10);
   });
 
-  // State to track the previous total to detect an increase (for the sound)
-  const [previousTotalPending, setPreviousTotalPending] = useState<number>(0);
+  const previousSolicitacoes = usePrevious(solicitacoes);
 
-  // Memoize the current total number of pending solicitations
-  const totalPending = useMemo(() => {
-    return solicitacoes.filter(s => s.status === 'pendente').length;
-  }, [solicitacoes]);
+  useEffect(() => {
+    if ('Notification' in window) {
+      setPermissionStatus(Notification.permission);
+    }
+  }, []);
 
-  // Effect to unlock audio on first user interaction
+  const requestPermission = useCallback(async () => {
+    if (!('Notification' in window)) {
+      toast.error("Este navegador não suporta notificações.");
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    setPermissionStatus(permission);
+    if (permission === 'granted') {
+      toast.success("Notificações ativadas!");
+    } else if (permission === 'denied') {
+      toast.warning("Notificações bloqueadas. Altere nas configurações do seu navegador.");
+    }
+  }, []);
+
+  const playSoundAndShowNotification = useCallback((title: string, options?: NotificationOptions) => {
+    // Play sound
+    if (isAudioUnlocked) {
+      audio.play().catch(error => console.error("Error playing sound:", error));
+    }
+    
+    // Show notification
+    if (permissionStatus === 'granted') {
+      new Notification(title, {
+        body: options?.body,
+        icon: '/logo.png', // Assuming you have a logo in public folder
+        ...options,
+      });
+    }
+  }, [isAudioUnlocked, permissionStatus]);
+
+
+  // Effect for notification triggers
+  useEffect(() => {
+    if (!previousSolicitacoes || !user) return;
+
+    // 1. Admin: New pending solicitation
+    if (user.role === 'admin') {
+      const newPending = solicitacoes.filter(
+        s => s.status === 'pendente' && !previousSolicitacoes.find(ps => ps.id === s.id)
+      );
+      if (newPending.length > 0) {
+        playSoundAndShowNotification('Nova Solicitação Pendente!', {
+          body: `${newPending[0].clienteNome} enviou uma nova solicitação.`
+        });
+      }
+    }
+
+    // 2. Driver: New assignment
+    if (user.role === 'entregador') {
+      solicitacoes.forEach(currentSolicitacao => {
+        const prevSolicitacao = previousSolicitacoes.find(ps => ps.id === currentSolicitacao.id);
+        if (
+          prevSolicitacao &&
+          currentSolicitacao.entregadorId === user.id &&
+          prevSolicitacao.entregadorId !== user.id
+        ) {
+          playSoundAndShowNotification('Nova Entrega Atribuída!', {
+            body: `A solicitação #${currentSolicitacao.codigo} foi atribuída a você.`
+          });
+        }
+      });
+    }
+
+  }, [solicitacoes, previousSolicitacoes, user, playSoundAndShowNotification]);
+
+
+  // Audio unlock logic
   useEffect(() => {
     const unlockAudio = () => {
-      // This is a common pattern to unlock audio playback in browsers.
-      // We attempt to play and immediately pause. This "unlocks" the audio context.
       audio.play().catch(() => {});
       audio.pause();
       audio.currentTime = 0;
-      
       setIsAudioUnlocked(true);
-      // Clean up listeners once audio is unlocked.
       window.removeEventListener('click', unlockAudio);
       window.removeEventListener('keydown', unlockAudio);
     };
-
     if (!isAudioUnlocked) {
       window.addEventListener('click', unlockAudio);
       window.addEventListener('keydown', unlockAudio);
     }
-
     return () => {
-        window.removeEventListener('click', unlockAudio);
-        window.removeEventListener('keydown', unlockAudio);
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
     };
   }, [isAudioUnlocked]);
 
-  // Effect to play sound only when the number of pending solicitations increases
-  useEffect(() => {
-    if (isAudioUnlocked && totalPending > previousTotalPending) {
-      audio.play().catch(error => console.error("Error playing notification sound:", error));
-    }
-    // Update the previous total for the next comparison
-    setPreviousTotalPending(totalPending);
-  }, [totalPending, previousTotalPending, isAudioUnlocked]);
 
-  // Initialize the previous count on mount to avoid sound on first load
-  useEffect(() => {
-    setPreviousTotalPending(totalPending);
-  }, [totalPending]);
+  // Badge count logic
+  const totalPending = useMemo(() => {
+    return solicitacoes.filter(s => s.status === 'pendente').length;
+  }, [solicitacoes]);
 
-
-  // Function to clear notifications by updating the "seen" count
   const clearSolicitacoesNotifications = useCallback(() => {
     localStorage.setItem(NOTIFICATION_STORAGE_KEY, String(totalPending));
     setLastSeenPendingCount(totalPending);
   }, [totalPending]);
 
-  // The badge count is the difference between the current total and the last seen total
   const solicitacoesCount = Math.max(0, totalPending - lastSeenPendingCount);
 
   const value = {
     solicitacoesCount,
     clearSolicitacoesNotifications,
+    requestPermission,
+    permissionStatus,
   };
 
   return (

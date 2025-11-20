@@ -15,9 +15,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { NavLink } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeProvider';
+import { useNotification } from '@/contexts/NotificationContext';
 
 export function AppHeader() {
   const { user } = useAuth();
+  const { solicitacoesCount } = useNotification();
   const { setTheme } = useTheme();
   const today = format(new Date(2025, 7, 19), "dd 'de' MMMM, yyyy", { locale: ptBR });
 
@@ -44,10 +46,12 @@ export function AppHeader() {
         </div>
         <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-full">
           <Bell className="h-4 w-4" />
-          <span className="absolute top-0 right-0 flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-          </span>
+          {solicitacoesCount > 0 && (
+            <span className="absolute top-0 right-0 flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+            </span>
+          )}
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

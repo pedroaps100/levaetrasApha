@@ -53,14 +53,15 @@ interface FaturaDetailsModalProps {
     onAddEntrega: (faturaId: string, data: EntregaManualFormData) => void;
     onUpdateEntrega: (faturaId: string, entregaId: string, data: Partial<EntregaManualFormData>) => void;
     onDeleteEntrega: (faturaId: string, entregaId: string) => void;
+    viewOnly?: boolean;
 }
 
-export const FaturaDetailsModal: React.FC<FaturaDetailsModalProps> = ({ isOpen, onClose, fatura, onRegisterTaxPayment, onRegisterRepassePayment, onAddEntrega, onUpdateEntrega, onDeleteEntrega }) => {
+export const FaturaDetailsModal: React.FC<FaturaDetailsModalProps> = ({ isOpen, onClose, fatura, onRegisterTaxPayment, onRegisterRepassePayment, onAddEntrega, onUpdateEntrega, onDeleteEntrega, viewOnly = false }) => {
   const [isTaxPaymentModalOpen, setIsTaxPaymentModalOpen] = useState(false);
   const [isRepassePaymentModalOpen, setIsRepassePaymentModalOpen] = useState(false);
   const [isEntregaModalOpen, setIsEntregaModalOpen] = useState(false);
   const [entregaToEdit, setEntregaToEdit] = useState<EntregaIncluida | null>(null);
-  const [isViewOnly, setIsViewOnly] = useState(false);
+  const [isEntregaViewOnly, setIsEntregaViewOnly] = useState(false);
 
   const faturaMemo = useMemo(() => fatura, [isOpen, fatura]);
 
@@ -95,9 +96,9 @@ export const FaturaDetailsModal: React.FC<FaturaDetailsModalProps> = ({ isOpen, 
     setIsRepassePaymentModalOpen(false);
   };
 
-  const handleOpenEntregaModal = (entrega: EntregaIncluida | null, viewOnly: boolean) => {
+  const handleOpenEntregaModal = (entrega: EntregaIncluida | null, viewOnlyModal: boolean) => {
     setEntregaToEdit(entrega);
-    setIsViewOnly(viewOnly);
+    setIsEntregaViewOnly(viewOnly || viewOnlyModal);
     setIsEntregaModalOpen(true);
   };
 
@@ -198,7 +199,7 @@ export const FaturaDetailsModal: React.FC<FaturaDetailsModalProps> = ({ isOpen, 
                     <TabsContent value="entregas" className="flex-1 overflow-y-auto mt-4">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-semibold text-base">Entregas Incluídas</h3>
-                            <Button size="sm" onClick={() => handleOpenEntregaModal(null, false)}><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Entrega Avulsa</Button>
+                            {!viewOnly && <Button size="sm" onClick={() => handleOpenEntregaModal(null, false)}><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Entrega Avulsa</Button>}
                         </div>
                         <div className="border rounded-lg">
                             <Table>
@@ -225,14 +226,18 @@ export const FaturaDetailsModal: React.FC<FaturaDetailsModalProps> = ({ isOpen, 
                                             <TableCell>{formatCurrency(e.valorRepasse)}</TableCell>
                                             <TableCell className="text-right">
                                                 <Button variant="ghost" size="icon" onClick={() => handleOpenEntregaModal(e, true)}><Eye className="h-4 w-4" /></Button>
-                                                <Button variant="ghost" size="icon" onClick={() => handleOpenEntregaModal(e, false)}><Pencil className="h-4 w-4" /></Button>
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-red-500"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                        <AlertDialogHeader><AlertDialogTitle>Confirmar exclusão</AlertDialogTitle><AlertDialogDescription>Deseja remover a entrega "{e.descricao}" da fatura?</AlertDialogDescription></AlertDialogHeader>
-                                                        <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => onDeleteEntrega(faturaMemo.id, e.id)}>Remover</AlertDialogAction></AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
+                                                {!viewOnly && (
+                                                    <>
+                                                        <Button variant="ghost" size="icon" onClick={() => handleOpenEntregaModal(e, false)}><Pencil className="h-4 w-4" /></Button>
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-red-500"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader><AlertDialogTitle>Confirmar exclusão</AlertDialogTitle><AlertDialogDescription>Deseja remover a entrega "{e.descricao}" da fatura?</AlertDialogDescription></AlertDialogHeader>
+                                                                <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => onDeleteEntrega(faturaMemo.id, e.id)}>Remover</AlertDialogAction></AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    </>
+                                                )}
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -251,11 +256,13 @@ export const FaturaDetailsModal: React.FC<FaturaDetailsModalProps> = ({ isOpen, 
                                     <Badge className={statusPagamentoConfig[faturaMemo.statusTaxas].badgeClass}>{statusPagamentoConfig[faturaMemo.statusTaxas].label}</Badge>
                                     <p className="text-sm text-muted-foreground mt-2">Valor: {formatCurrency(faturaMemo.valorTaxas)}</p>
                                 </CardContent>
-                                <CardFooter>
-                                    <Button disabled={faturaMemo.statusTaxas === 'Paga'} onClick={() => setIsTaxPaymentModalOpen(true)}>
-                                        <PlusCircle className="mr-2 h-4 w-4" /> Lançar Pagamento de Taxas
-                                    </Button>
-                                </CardFooter>
+                                {!viewOnly && (
+                                    <CardFooter>
+                                        <Button disabled={faturaMemo.statusTaxas === 'Paga'} onClick={() => setIsTaxPaymentModalOpen(true)}>
+                                            <PlusCircle className="mr-2 h-4 w-4" /> Lançar Pagamento de Taxas
+                                        </Button>
+                                    </CardFooter>
+                                )}
                             </Card>
                             <Card>
                                 <CardHeader>
@@ -266,11 +273,13 @@ export const FaturaDetailsModal: React.FC<FaturaDetailsModalProps> = ({ isOpen, 
                                     <Badge className={statusRepasseConfig[faturaMemo.statusRepasse].badgeClass}>{statusRepasseConfig[faturaMemo.statusRepasse].label}</Badge>
                                     <p className="text-sm text-muted-foreground mt-2">Valor: {formatCurrency(faturaMemo.valorRepasse)}</p>
                                 </CardContent>
-                                <CardFooter>
-                                    <Button disabled={faturaMemo.statusRepasse === 'Repassado' || faturaMemo.valorRepasse === 0} onClick={() => setIsRepassePaymentModalOpen(true)}>
-                                        <PlusCircle className="mr-2 h-4 w-4" /> Lançar Pagamento de Repasse
-                                    </Button>
-                                </CardFooter>
+                                {!viewOnly && (
+                                    <CardFooter>
+                                        <Button disabled={faturaMemo.statusRepasse === 'Repassado' || faturaMemo.valorRepasse === 0} onClick={() => setIsRepassePaymentModalOpen(true)}>
+                                            <PlusCircle className="mr-2 h-4 w-4" /> Lançar Pagamento de Repasse
+                                        </Button>
+                                    </CardFooter>
+                                )}
                             </Card>
                         </div>
                     </TabsContent>
@@ -285,8 +294,12 @@ export const FaturaDetailsModal: React.FC<FaturaDetailsModalProps> = ({ isOpen, 
               <div className="flex flex-col sm:flex-row items-center justify-end gap-2 w-full">
                   <Button variant="ghost" onClick={onClose}>Fechar</Button>
                   <Button variant="outline" onClick={() => toast.info("Funcionalidade de impressão será implementada.")}><Printer className="mr-2 h-4 w-4" />Imprimir</Button>
-                  <Button variant="outline" onClick={() => toast.info("Funcionalidade de envio por e-mail será implementada.")}><Mail className="mr-2 h-4 w-4" />Enviar por E-mail</Button>
-                  <Button onClick={() => toast.info("Funcionalidade de fechar fatura será implementada.")}>Fechar Fatura</Button>
+                  {!viewOnly && (
+                    <>
+                        <Button variant="outline" onClick={() => toast.info("Funcionalidade de envio por e-mail será implementada.")}><Mail className="mr-2 h-4 w-4" />Enviar por E-mail</Button>
+                        <Button onClick={() => toast.info("Funcionalidade de fechar fatura será implementada.")}>Fechar Fatura</Button>
+                    </>
+                  )}
               </div>
           </DialogFooter>
         </DialogContent>
@@ -309,7 +322,7 @@ export const FaturaDetailsModal: React.FC<FaturaDetailsModalProps> = ({ isOpen, 
         faturaId={faturaMemo.id}
         entregaToEdit={entregaToEdit}
         onFormSubmit={handleEntregaSubmit}
-        viewOnly={isViewOnly}
+        viewOnly={isEntregaViewOnly}
       />
     </>
   );

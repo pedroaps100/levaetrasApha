@@ -103,7 +103,6 @@ export function RecentTransactions() {
           </TabsList>
         </div>
         
-        {/* Contas a Pagar */}
         <TabsContent value="contas">
           <Card>
             <CardHeader>
@@ -119,7 +118,6 @@ export function RecentTransactions() {
           </Card>
         </TabsContent>
 
-        {/* Faturas Vencidas */}
         <TabsContent value="faturas">
            <Card>
             <CardHeader>
@@ -135,7 +133,6 @@ export function RecentTransactions() {
           </Card>
         </TabsContent>
 
-        {/* Entregas */}
         <TabsContent value="entregas">
           <Card>
             <CardHeader>
@@ -145,8 +142,91 @@ export function RecentTransactions() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="hidden lg:block"><Table><TableHeader><TableRow><TableHead>Solicitação</TableHead><TableHead>Cliente</TableHead><TableHead>Entregador</TableHead><TableHead className="text-right">Taxa Entrega</TableHead><TableHead className="text-right">Taxas Extras</TableHead><TableHead className="text-right">Valor Total</TableHead><TableHead className="text-center">Status</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader><TableBody>{entregasRecentes.map(s => (<TableRow key={s.id}><TableCell><div className="font-medium">{s.codigo}</div><div className="text-sm text-muted-foreground">{format(s.dataSolicitacao, 'dd/MM/yyyy HH:mm')}</div></TableCell><TableCell><div className="flex items-center gap-2"><Avatar className="h-8 w-8"><AvatarImage src={s.clienteAvatar} /><AvatarFallback>{s.clienteNome.charAt(0)}</AvatarFallback></Avatar>{s.clienteNome}</div></TableCell><TableCell>{s.entregadorNome || <span className="text-muted-foreground">Não atribuído</span>}</TableCell><TableCell className="text-right">{formatCurrency(s.valorTotalTaxas)}</TableCell><TableCell className="text-right">{formatCurrency(s.valorTotalTaxasExtras || 0)}</TableCell><TableCell className="text-right font-bold">{formatCurrency((s.valorTotalTaxas || 0) + (s.valorTotalTaxasExtras || 0))}</TableCell><TableCell className="text-center"><Badge className={statusConfig[s.status].badgeClass}>{statusConfig[s.status].label}</Badge></TableCell><TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => setSolicitacaoToView(s)}><Eye className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></div>
-              <div className="grid gap-4 lg:hidden p-4">{entregasRecentes.map(s => (<Card key={s.id}><CardHeader><div className="flex justify-between items-start"><div><CardTitle className="text-base">{s.codigo}</CardTitle><CardDescription>{s.clienteNome}</CardDescription></div><Badge className={statusConfig[s.status].badgeClass}>{statusConfig[s.status].label}</Badge></div></CardHeader><CardContent className="text-sm space-y-2"><p><span className="font-medium text-muted-foreground">Data:</span> {format(s.dataSolicitacao, 'dd/MM/yy HH:mm')}</p><p><span className="font-medium text-muted-foreground">Entregador:</span> {s.entregadorNome || 'Não atribuído'}</p><div className="border-t pt-2 mt-2 space-y-1"><div className="flex justify-between"><span className="text-muted-foreground">Taxa de Entrega:</span><span>{formatCurrency(s.valorTotalTaxas)}</span></div><div className="flex justify-between"><span className="text-muted-foreground">Taxas Extras:</span><span>{formatCurrency(s.valorTotalTaxasExtras || 0)}</span></div><div className="flex justify-between font-bold"><span>Valor Total:</span><span>{formatCurrency((s.valorTotalTaxas || 0) + (s.valorTotalTaxasExtras || 0))}</span></div></div></CardContent><CardFooter className="flex justify-end"><Button variant="ghost" size="icon" onClick={() => setSolicitacaoToView(s)}><Eye className="h-4 w-4" /></Button></CardFooter></Card>))}</div>
+              <div className="hidden lg:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Solicitação</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
+                      <TableHead>Entregador</TableHead>
+                      <TableHead className="text-right">Taxa Entrega</TableHead>
+                      <TableHead className="text-right">Taxas Extras</TableHead>
+                      <TableHead className="text-right">Valor Total</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {entregasRecentes.map(s => (
+                      <TableRow key={s.id}>
+                        <TableCell>
+                          <div className="font-medium">{s.codigo}</div>
+                          <div className="text-sm text-muted-foreground">{s.clienteNome}</div>
+                        </TableCell>
+                        <TableCell>{format(s.dataSolicitacao, 'dd/MM/yyyy HH:mm')}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge className={statusConfig[s.status].badgeClass}>{statusConfig[s.status].label}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {s.entregadorNome ? (
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={s.entregadorAvatar} />
+                                <AvatarFallback>{s.entregadorNome.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                              </Avatar>
+                              <span className="truncate">{s.entregadorNome}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">Não atribuído</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(s.valorTotalTaxas)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(s.valorTotalTaxasExtras || 0)}</TableCell>
+                        <TableCell className="text-right font-bold">{formatCurrency((s.valorTotalTaxas || 0) + (s.valorTotalTaxasExtras || 0))}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" onClick={() => setSolicitacaoToView(s)}><Eye className="h-4 w-4" /></Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="grid gap-4 lg:hidden p-4">
+                {entregasRecentes.map(s => (
+                    <Card key={s.id}>
+                        <CardHeader>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <CardTitle className="text-base">{s.codigo}</CardTitle>
+                                    <CardDescription>{s.clienteNome}</CardDescription>
+                                </div>
+                                <Badge className={statusConfig[s.status].badgeClass}>{statusConfig[s.status].label}</Badge>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="text-sm space-y-3">
+                            <p><span className="font-medium text-muted-foreground">Data:</span> {format(s.dataSolicitacao, 'dd/MM/yy HH:mm')}</p>
+                            <p><span className="font-medium text-muted-foreground">Entregador:</span> {s.entregadorNome || 'Não atribuído'}</p>
+                            <div className="border-t pt-2 mt-2 space-y-1">
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Taxa de Entrega:</span>
+                                    <span>{formatCurrency(s.valorTotalTaxas)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Taxas Extras:</span>
+                                    <span>{formatCurrency(s.valorTotalTaxasExtras || 0)}</span>
+                                </div>
+                                <div className="flex justify-between font-bold">
+                                    <span>Valor Total:</span>
+                                    <span>{formatCurrency((s.valorTotalTaxas || 0) + (s.valorTotalTaxasExtras || 0))}</span>
+                                </div>
+                            </div>
+                        </CardContent>
+                        <CardFooter className="flex justify-end">
+                            <Button variant="ghost" size="icon" onClick={() => setSolicitacaoToView(s)}><Eye className="h-4 w-4" /></Button>
+                        </CardFooter>
+                    </Card>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

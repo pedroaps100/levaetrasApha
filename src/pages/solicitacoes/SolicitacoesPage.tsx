@@ -25,6 +25,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { ConciliacaoDialog } from './ConciliacaoDialog';
 import { useSettingsData } from '@/hooks/useSettingsData';
+import { cn } from '@/lib/utils';
 
 
 const MetricCard: React.FC<{ title: string; value: number | string; icon: React.ElementType; colorClass: string }> = ({ title, value, icon: Icon, colorClass }) => (
@@ -257,7 +258,12 @@ export const SolicitacoesPage: React.FC = () => {
                                     <TabsTrigger key={tab.value} value={tab.value} className="flex-shrink-0 flex items-center justify-center gap-2">
                                         {tab.label}
                                         {count > 0 && (
-                                            <Badge variant="secondary" className="h-5 px-2 rounded-full">
+                                            <Badge className={cn(
+                                                "h-5 px-2 rounded-full border-transparent",
+                                                tab.value === 'pendente' && count > 0
+                                                    ? "bg-orange-100 text-orange-800 hover:bg-orange-100/80 dark:bg-orange-900/50 dark:text-orange-300"
+                                                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                                            )}>
                                                 {count}
                                             </Badge>
                                         )}

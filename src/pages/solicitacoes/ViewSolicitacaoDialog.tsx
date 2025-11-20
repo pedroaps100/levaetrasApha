@@ -1,15 +1,19 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Solicitacao } from '@/types';
 import { Separator } from '@/components/ui/separator';
 import { useSettingsData } from '@/hooks/useSettingsData';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, History } from 'lucide-react';
+import { AlertTriangle, History, Download, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { HistoricoSolicitacaoTab } from './HistoricoSolicitacaoTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 interface ViewSolicitacaoDialogProps {
     isOpen: boolean;
@@ -59,14 +63,14 @@ const DetalhesTab: React.FC<{ solicitacao: Solicitacao }> = ({ solicitacao }) =>
             <div>
                 <h4 className="font-semibold mb-2">Rotas</h4>
                 <div className="space-y-3">
-                    {solicitacao.rotas.map((rota, index) => {
+                    {solicitacao.rotas.map((rota) => {
                         const bairro = bairros.find(b => b.id === rota.bairroDestinoId);
                         const taxasExtrasDaRota = taxasExtras.filter(te => rota.taxasExtrasIds?.includes(te.id));
                         const valorTaxasExtrasDaRota = taxasExtrasDaRota.reduce((sum, te) => sum + te.valor, 0);
                         const subtotalRota = (rota.taxaEntrega || 0) + (rota.valorExtra || 0) + valorTaxasExtrasDaRota;
                         return (
-                            <div key={index} className="p-3 border rounded-lg space-y-2">
-                                <p className="font-semibold">Rota #{index + 1}: {bairro?.nome}</p>
+                            <div key={rota.id} className="p-3 border rounded-lg space-y-2">
+                                <p className="font-semibold">Rota: {bairro?.nome}</p>
                                 <p className="text-sm"><span className="text-muted-foreground">Responsável:</span> {rota.responsavel}</p>
                                 <p className="text-sm"><span className="text-muted-foreground">Telefone:</span> {rota.telefone}</p>
                                 {rota.observacoes && <p className="text-sm"><span className="text-muted-foreground">Observações:</span> {rota.observacoes}</p>}
@@ -115,8 +119,51 @@ const DetalhesTab: React.FC<{ solicitacao: Solicitacao }> = ({ solicitacao }) =>
 
 export const ViewSolicitacaoDialog: React.FC<ViewSolicitacaoDialogProps> = ({ isOpen, onClose, solicitacao }) => {
     const { user } = useAuth();
+    const contentRef = useRef<HTMLDivElement>(null);
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     
     if (!solicitacao) return null;
+
+    const handleDownloadPDF = () => {
+        const elementToCapture = contentRef.current;
+        if (!elementToCapture) {
+            toast.error("Não foi possível encontrar o conteúdo para gerar o PDF.");
+            return;
+        }
+
+        setIsGeneratingPdf(true);
+
+        const originalClassName = elementToCapture.className;
+        const originalScrollTop = elementToCapture.scrollTop;
+
+        elementToCapture.className = 'p-4 bg-background dark:bg-background'; 
+        elementToCapture.scrollTop = 0;
+
+        html2canvas(elementToCapture, {
+            scale: 1, // Reduzido de 2 para 1 para diminuir o tamanho do arquivo
+            useCORS: true,
+            backgroundColor: window.getComputedStyle(document.body).backgroundColor,
+            onclone: (clonedDoc) => {
+                clonedDoc.documentElement.className = window.document.documentElement.className;
+            }
+        }).then(canvas => {
+            const imgData = canvas.toDataURL('image/png', 0.92); // Adicionado leve compressão
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save(`solicitacao_${solicitacao.codigo}.pdf`);
+        }).catch(err => {
+            console.error("Erro ao gerar PDF:", err);
+            toast.error("Ocorreu um erro ao gerar o PDF.");
+        }).finally(() => {
+            elementToCapture.className = originalClassName;
+            elementToCapture.scrollTop = originalScrollTop;
+            setIsGeneratingPdf(false);
+        });
+    };
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -127,7 +174,7 @@ export const ViewSolicitacaoDialog: React.FC<ViewSolicitacaoDialogProps> = ({ is
                         Visualização completa dos dados da solicitação.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="max-h-[70vh] overflow-y-auto p-1 pr-4">
+                <div className="max-h-[70vh] overflow-y-auto p-4" ref={contentRef}>
                     <Tabs defaultValue="detalhes">
                         <TabsList className={cn("grid w-full", user?.role === 'admin' ? "grid-cols-2" : "grid-cols-1")}>
                             <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
@@ -147,8 +194,16 @@ export const ViewSolicitacaoDialog: React.FC<ViewSolicitacaoDialogProps> = ({ is
                         )}
                     </Tabs>
                 </div>
-                <DialogFooter className="pt-4">
-                    <Button type="button" variant="outline" onClick={onClose}>Fechar</Button>
+                <DialogFooter className="pt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <Button type="button" variant="outline" onClick={handleDownloadPDF} disabled={isGeneratingPdf} className="w-full sm:w-auto">
+                        {isGeneratingPdf ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                            <Download className="mr-2 h-4 w-4" />
+                        )}
+                        {isGeneratingPdf ? 'Gerando...' : 'Baixar PDF'}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-auto">Fechar</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

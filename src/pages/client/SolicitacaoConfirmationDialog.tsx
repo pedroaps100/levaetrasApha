@@ -46,7 +46,7 @@ export const SolicitacaoConfirmationDialog: React.FC<SolicitacaoConfirmationDial
                                 const bairro = bairros.find(b => b.id === rota.bairroDestinoId);
                                 const taxasExtrasDaRota = taxasExtras.filter(te => rota.taxasExtrasIds?.includes(te.id));
                                 return (
-                                    <div key={index} className="p-3 border rounded-lg space-y-2">
+                                    <div key={rota.id} className="p-3 border rounded-lg space-y-2">
                                         <p className="font-semibold">Rota #{index + 1}: {bairro?.nome}</p>
                                         <p className="text-sm"><span className="text-muted-foreground">Responsável:</span> {rota.responsavel}</p>
                                         <p className="text-sm"><span className="text-muted-foreground">Telefone:</span> {rota.telefone}</p>

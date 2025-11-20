@@ -34,7 +34,7 @@ const NavItem: React.FC<{ item: { title: string; url: string; icon: React.Elemen
     )}>
       <item.icon className={cn("h-5 w-5", isActive && "text-primary")} />
       {!isCollapsed && <span className="flex-1">{item.title}</span>}
-      {item.badge && item.badge > 0 && !isCollapsed && (
+      {item.badge > 0 && !isCollapsed && (
         <Badge className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-500 text-white border-none">
           {item.badge}
         </Badge>

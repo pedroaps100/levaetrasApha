@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { useNotification } from '@/contexts/NotificationContext';
+import { BellRing, Check, X } from 'lucide-react';
 
 interface NotificationSettings {
   vencimentos: boolean;
@@ -19,9 +22,22 @@ export const NotificationsTab = () => {
     solicitacoes: true,
   });
 
+  const { requestPermission, permissionStatus } = useNotification();
+
   const handleToggle = (key: keyof NotificationSettings) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
     toast.success("Configuração de notificação atualizada!");
+  };
+
+  const getPermissionStatusText = () => {
+    switch (permissionStatus) {
+      case 'granted':
+        return <span className="flex items-center gap-1 text-green-600"><Check className="h-4 w-4" /> Ativadas</span>;
+      case 'denied':
+        return <span className="flex items-center gap-1 text-red-600"><X className="h-4 w-4" /> Bloqueadas</span>;
+      default:
+        return <span className="text-muted-foreground">Não solicitado</span>;
+    }
   };
 
   return (
@@ -31,6 +47,17 @@ export const NotificationsTab = () => {
         <CardDescription>Escolha como e quando você quer ser notificado.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-6">
+        <div className="flex items-center justify-between space-x-4 rounded-md border p-4">
+          <div className="flex flex-col space-y-1">
+            <Label className="font-medium">Notificações Push no Navegador</Label>
+            <span className="text-sm text-muted-foreground">Receba alertas em tempo real sobre novas solicitações e atribuições.</span>
+            <div className="text-sm pt-1">Status atual: {getPermissionStatusText()}</div>
+          </div>
+          <Button onClick={requestPermission} disabled={permissionStatus === 'denied'}>
+            <BellRing className="mr-2 h-4 w-4" />
+            {permissionStatus === 'granted' ? 'Revisar Permissão' : 'Ativar Notificações'}
+          </Button>
+        </div>
         <div className="flex items-center justify-between space-x-4 rounded-md border p-4">
           <div className="flex flex-col space-y-1">
             <Label htmlFor="vencimentos" className="font-medium">Vencimentos de Contas</Label>
